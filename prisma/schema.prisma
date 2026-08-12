@@ -1,10 +1,7 @@
-// Prisma schema.
-// NOTE: provider is "sqlite" for local development (no Postgres available in this
-// environment). This is intentionally Postgres-portable: no SQLite-only features are
-// used (no native enums — status fields are Strings validated in code, see
-// src/lib/constants.ts). To move to production, change `provider` below to
-// "postgresql", point DATABASE_URL at a real Postgres instance (e.g. Neon), delete
-// prisma/migrations, and run `prisma migrate dev` again.
+// Prisma schema. Postgres (Neon), provisioned via the Vercel/Neon integration.
+// Status fields stay String (not native enums) validated in code — see
+// src/lib/constants.ts — so this schema also still works unchanged on SQLite for
+// quick local prototyping if ever needed.
 
 generator client {
   provider = "prisma-client"
@@ -12,7 +9,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
 }
 
 model Admin {

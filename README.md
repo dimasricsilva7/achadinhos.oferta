@@ -10,9 +10,11 @@ Este é o **MVP (fase 1)** de um escopo maior — ver [Roadmap](#roadmap--fora-d
 
 - **Next.js 16** (App Router, TypeScript) + React 19
 - **Tailwind CSS v4** — design tokens em `src/app/globals.css`
-- **Prisma 7** — schema em `prisma/schema.prisma`. **SQLite em desenvolvimento**
-  (nenhum Postgres/Docker disponível no ambiente em que este projeto foi criado); o
-  schema é escrito para ser portável para Postgres — ver [Migrando para Postgres](#migrando-para-postgres).
+- **Prisma 7** — schema em `prisma/schema.prisma`. **Postgres (Neon)**, provisionado
+  via a integração Neon↔Vercel. `DATABASE_URL` (pooled, PgBouncer) é usada em
+  runtime pela aplicação; `DATABASE_URL_UNPOOLED` (conexão direta) é usada só pelo
+  Prisma CLI para migrações, já que o pooler do Neon não suporta os advisory locks
+  que o Prisma Migrate precisa.
 - **jose** (JWT) + **bcryptjs** — sessão de admin via cookie httpOnly assinado
 - **zod** — validação de entrada em toda API
 
@@ -20,12 +22,16 @@ Este é o **MVP (fase 1)** de um escopo maior — ver [Roadmap](#roadmap--fora-d
 
 ```bash
 npm install
-cp .env.example .env      # gere um SESSION_SECRET novo (comando abaixo)
+cp .env.example .env
+# preencha DATABASE_URL / DATABASE_URL_UNPOOLED (Neon) e gere um SESSION_SECRET:
 node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
-npx prisma migrate dev    # cria prisma/dev.db e aplica o schema
+npx prisma migrate dev    # aplica o schema no Postgres
 npx prisma db seed        # cria o admin e um produto DEMO
 npm run dev
 ```
+
+Se o projeto já está linkado à Vercel (`npx vercel link`), dá pra puxar as variáveis
+reais em vez de preencher manualmente: `npx vercel env pull .env`.
 
 - Loja: http://localhost:3000
 - Produto demo: http://localhost:3000/produto/kit-sensorial-de-bolso-demo
@@ -112,18 +118,15 @@ prisma/
 atual do framework). Protege `/admin/*` e `/api/admin/*` no servidor; esconder botões
 no client não é autorização.
 
-## Migrando para Postgres
+## Deploy (Vercel)
 
-1. Em `prisma/schema.prisma`, troque `provider = "sqlite"` por `"postgresql"`.
-2. Troque o driver adapter em `src/lib/db.ts` e `prisma/seed.ts`
-   (`@prisma/adapter-better-sqlite3` → `@prisma/adapter-pg`, `npm install pg`).
-3. Aponte `DATABASE_URL` para o Postgres real (ex.: Neon, que é o mesmo provedor
-   usado pela própria plataforma de checkout).
-4. Apague `prisma/migrations/` e rode `npx prisma migrate dev` novamente.
-
-Nenhum recurso específico de SQLite foi usado no schema (sem enums nativos — os
-status são `String` validados em `src/lib/constants.ts` — e sem listas escalares),
-então a migração é mecânica.
+Projeto linkado via `npx vercel link --project shopee-oferta`. `DATABASE_URL` (e as
+demais variáveis do Neon) já são injetadas automaticamente pela integração
+Neon↔Vercel; `SESSION_SECRET` foi adicionada manualmente com `npx vercel env add`
+(valores diferentes em produção/preview vs. development). O `postinstall: "prisma
+generate"` no `package.json` é o que faz o build da Vercel gerar o client do Prisma
+antes do `next build` — sem isso o build falha com `Module not found:
+'@/generated/prisma/client'`, já que esse diretório é gerado e fica fora do Git.
 
 ## Roadmap / fora do escopo desta fase
 
