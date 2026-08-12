@@ -1,0 +1,183 @@
+// Prisma schema.
+// NOTE: provider is "sqlite" for local development (no Postgres available in this
+// environment). This is intentionally Postgres-portable: no SQLite-only features are
+// used (no native enums — status fields are Strings validated in code, see
+// src/lib/constants.ts). To move to production, change `provider` below to
+// "postgresql", point DATABASE_URL at a real Postgres instance (e.g. Neon), delete
+// prisma/migrations, and run `prisma migrate dev` again.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  auditLogs AuditLog[]
+}
+
+model Product {
+  id               String   @id @default(cuid())
+  slug             String   @unique
+  name             String
+  shortDescription String?
+  description      String?
+  status           String   @default("DRAFT") // ProductStatus: DRAFT | ACTIVE | ARCHIVED
+
+  sku String? @unique
+
+  // Money stored as integer cents — never floating point.
+  priceCents           Int
+  compareAtPriceCents  Int?
+  stock                Int @default(0)
+  soldCount            Int @default(0)
+  ratingAverage        Float @default(0)
+  ratingCount          Int   @default(0)
+
+  // Offer / countdown — the deadline is the single source of truth.
+  // The client only ever renders (expiresAt - now); it never owns the timer.
+  offerEnabled  Boolean   @default(false)
+  offerExpiresAt DateTime?
+
+  // Checkout integration: the real, verified contract with the external checkout
+  // (pagseguropix.org / bravopay.club) is a pre-built static page per slug — there is
+  // no discovered mechanism to pass product/price/qty via query params. So each
+  // product (or variant) carries its own pre-built checkout URL.
+  checkoutUrl String?
+
+  deletedAt DateTime? // soft delete — orders must keep referencing the product
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images         ProductImage[]
+  variants       ProductVariant[]
+  specifications ProductSpecification[]
+  benefits       ProductBenefit[]
+  orders         Order[]
+
+  @@index([status])
+  @@index([deletedAt])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  url       String
+  alt       String  @default("")
+  type      String  @default("image") // image | video
+  sortOrder Int     @default(0)
+  isPrimary Boolean @default(false)
+
+  @@index([productId])
+}
+
+// Single variant dimension for MVP (e.g. "Cor"), grouped by `groupName`.
+// Selecting a variant is the single source of truth for effective price/stock/image
+// — see src/lib/pricing.ts:resolveEffectiveProduct().
+model ProductVariant {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  groupName String // e.g. "Cor", "Modelo"
+  label     String // e.g. "Preto"
+  sku       String?
+  imageUrl  String?
+
+  priceCents Int? // overrides product.priceCents when set
+  stock      Int  @default(0)
+
+  checkoutUrl String? // overrides product.checkoutUrl when set
+  sortOrder   Int     @default(0)
+
+  orders Order[]
+
+  @@index([productId])
+}
+
+model ProductSpecification {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  label     String
+  value     String
+  sortOrder Int    @default(0)
+
+  @@index([productId])
+}
+
+model ProductBenefit {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  icon      String @default("check")
+  label     String
+  sortOrder Int    @default(0)
+
+  @@index([productId])
+}
+
+model Order {
+  id           String  @id @default(cuid())
+  orderNumber  String  @unique
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  variantId String?
+  variant   ProductVariant? @relation(fields: [variantId], references: [id])
+
+  quantity       Int
+  unitPriceCents Int
+  totalCents     Int
+
+  // PENDING = intent created, user sent to external checkout.
+  // No webhook/API access into pagseguropix.org was found (see README) — status
+  // beyond PENDING is set manually by an admin from confirmed payment evidence,
+  // never inferred automatically.
+  status String @default("PENDING") // OrderStatus
+
+  checkoutUrl String // exact URL the customer was redirected to, for audit
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([productId])
+}
+
+model Settings {
+  id             String @id @default("singleton")
+  siteName       String @default("Minha Loja")
+  supportContact String?
+  updatedAt      DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  adminId   String?
+  admin     Admin?   @relation(fields: [adminId], references: [id])
+  action    String   // e.g. PRODUCT_CREATED, PRODUCT_UPDATED, ADMIN_LOGIN
+  entity    String
+  entityId  String?
+  metadata  String?  // JSON-encoded, no secrets
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([entity, entityId])
+}

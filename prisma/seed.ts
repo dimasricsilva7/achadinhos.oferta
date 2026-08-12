@@ -1,0 +1,102 @@
+import "dotenv/config";
+import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaBetterSqlite3 } from "@prisma/adapter-better-sqlite3";
+import bcrypt from "bcryptjs";
+
+const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL ?? "file:./dev.db" });
+const db = new PrismaClient({ adapter });
+
+async function main() {
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@loja.com";
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? "TrocarSenha123!";
+
+  const admin = await db.admin.upsert({
+    where: { email: adminEmail },
+    update: {},
+    create: {
+      email: adminEmail,
+      passwordHash: await bcrypt.hash(adminPassword, 12),
+      name: "Administrador",
+    },
+  });
+  console.log(`Admin: ${admin.email} (senha: ${adminPassword} — troque após o primeiro login)`);
+
+  await db.settings.upsert({
+    where: { id: "singleton" },
+    update: {},
+    create: { id: "singleton", siteName: "Minha Loja" },
+  });
+
+  // DEMO product — clearly labeled, safe to delete from the admin panel at any time.
+  // checkoutUrl points at the real pagseguropix.org test page the project owner
+  // provided, so the full buy -> checkout redirect flow can be tested end-to-end.
+  const existing = await db.product.findUnique({ where: { slug: "kit-sensorial-de-bolso-demo" } });
+  if (existing) {
+    console.log("Produto DEMO já existe, pulando.");
+    return;
+  }
+
+  const offerExpiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  const product = await db.product.create({
+    data: {
+      slug: "kit-sensorial-de-bolso-demo",
+      name: "[DEMO] Kit Sensorial de Bolso 6 em 1",
+      shortDescription: "Alívio do estresse, foco e diversão em um kit compacto.",
+      description:
+        "Produto de demonstração (DEMO) criado pelo seed. Use-o para validar o fluxo completo de compra antes de cadastrar produtos reais.\n\nKit com 6 acessórios sensoriais compactos, ideal para uso diário.",
+      status: "ACTIVE",
+      sku: "DEMO-KIT-001",
+      priceCents: 4990,
+      compareAtPriceCents: 7990,
+      stock: 25,
+      soldCount: 128,
+      ratingAverage: 4.8,
+      ratingCount: 342,
+      offerEnabled: true,
+      offerExpiresAt,
+      checkoutUrl: "https://pagseguropix.org/c/produto-teste-checkout",
+    },
+  });
+
+  await db.productImage.createMany({
+    data: [
+      { productId: product.id, url: "", alt: "Kit sensorial de bolso", sortOrder: 0, isPrimary: true },
+    ],
+  });
+
+  await db.productVariant.createMany({
+    data: [
+      { productId: product.id, groupName: "Cor", label: "Multicolorido 1", stock: 10, sortOrder: 0 },
+      { productId: product.id, groupName: "Cor", label: "Multicolorido 2", stock: 8, sortOrder: 1 },
+      { productId: product.id, groupName: "Cor", label: "Multicolorido 3", stock: 0, sortOrder: 2 },
+    ],
+  });
+
+  await db.productSpecification.createMany({
+    data: [
+      { productId: product.id, label: "Material", value: "Silicone atóxico", sortOrder: 0 },
+      { productId: product.id, label: "Peças", value: "6 unidades", sortOrder: 1 },
+      { productId: product.id, label: "Indicação", value: "A partir de 6 anos", sortOrder: 2 },
+    ],
+  });
+
+  await db.productBenefit.createMany({
+    data: [
+      { productId: product.id, icon: "shipping", label: "Envio rápido", sortOrder: 0 },
+      { productId: product.id, icon: "shield", label: "Compra segura", sortOrder: 1 },
+      { productId: product.id, icon: "warranty", label: "Garantia de 7 dias", sortOrder: 2 },
+    ],
+  });
+
+  console.log(`Produto DEMO criado: /produto/${product.slug}`);
+}
+
+main()
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await db.$disconnect();
+  });
