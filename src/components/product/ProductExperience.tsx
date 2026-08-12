@@ -6,7 +6,7 @@ import { ProductHeader } from "@/components/product/ProductHeader";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { OfferBanner } from "@/components/product/OfferBanner";
 import { PriceBlock } from "@/components/product/PriceBlock";
-import { RatingSold } from "@/components/product/RatingSold";
+import { SoldBadge, RatingSummary } from "@/components/product/RatingSold";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { Benefits } from "@/components/product/Benefits";
@@ -83,7 +83,10 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
       />
 
       <div className="flex flex-col gap-4 px-3 py-4">
-        <PriceBlock priceCents={effectivePriceCents} compareAtPriceCents={effectiveCompareAtPriceCents} />
+        <div className="flex items-start justify-between gap-2">
+          <PriceBlock priceCents={effectivePriceCents} compareAtPriceCents={effectiveCompareAtPriceCents} />
+          <SoldBadge soldCount={product.soldCount} />
+        </div>
 
         <div>
           <h1 className="text-base font-semibold leading-snug text-foreground">{product.name}</h1>
@@ -91,8 +94,6 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
             <p className="mt-1 text-sm text-foreground/60">{product.shortDescription}</p>
           )}
         </div>
-
-        <RatingSold ratingAverage={product.ratingAverage} ratingCount={product.ratingCount} soldCount={product.soldCount} />
 
         <p className="text-xs text-foreground/50">
           {outOfStock ? <span className="font-medium text-price">Esgotado</span> : `Estoque: ${effectiveStock}`}
@@ -105,6 +106,7 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
         <Benefits benefits={product.benefits} />
         <Description text={product.description} />
         <Specifications specs={product.specifications} />
+        <RatingSummary ratingAverage={product.ratingAverage} ratingCount={product.ratingCount} />
       </div>
 
       <div className="h-2" />

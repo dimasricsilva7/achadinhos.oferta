@@ -11,6 +11,14 @@ function formatRemaining(ms: number) {
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
+function LightningIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8Z" />
+    </svg>
+  );
+}
+
 // The countdown only ever renders (offerExpiresAt - now). It never owns or extends
 // the deadline itself, so a paused tab, a refresh, or a manipulated device clock
 // cannot grant extra time — and it never determines the charged price either; see
@@ -40,8 +48,9 @@ export function OfferBanner({
   // Avoid a hydration mismatch: render nothing time-dependent until mounted.
   if (now === null) {
     return (
-      <div className="flex items-center justify-between bg-warning px-3 py-2 text-sm font-semibold text-white">
-        <span>Oferta por tempo limitado</span>
+      <div className="flex items-center gap-1.5 bg-warning px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-white">
+        <LightningIcon />
+        <span>Oferta relâmpago</span>
       </div>
     );
   }
@@ -51,16 +60,23 @@ export function OfferBanner({
 
   if (expired) {
     return (
-      <div className="flex items-center justify-between bg-neutral-500 px-3 py-2 text-sm font-semibold text-white">
+      <div className="flex items-center gap-1.5 bg-neutral-500 px-3 py-2.5 text-sm font-bold uppercase tracking-wide text-white">
         <span>Oferta encerrada</span>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center justify-between gap-2 bg-warning px-3 py-2 text-sm font-semibold text-white">
-      <span>{discountPercent ? `Oferta relâmpago – ${discountPercent}% OFF` : "Oferta por tempo limitado"}</span>
-      <span className="rounded bg-black/20 px-2 py-0.5 font-mono tabular-nums" aria-live="polite">
+    <div className="flex items-center justify-between gap-2 bg-warning px-3 py-2.5 text-white">
+      <span className="flex items-center gap-1.5 text-sm font-bold uppercase tracking-wide">
+        <LightningIcon />
+        {discountPercent ? `Oferta relâmpago – ${discountPercent}% OFF` : "Oferta relâmpago"}
+      </span>
+      <span
+        className="rounded bg-black/25 px-2 py-1 font-mono text-base font-bold tabular-nums"
+        aria-live="polite"
+        aria-label={`Termina em ${formatRemaining(remainingMs)}`}
+      >
         {formatRemaining(remainingMs)}
       </span>
     </div>
