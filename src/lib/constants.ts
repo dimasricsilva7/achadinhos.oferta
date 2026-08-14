@@ -33,5 +33,6 @@ export const AUDIT_ACTION = [
   "PRICE_CHANGED",
   "STOCK_CHANGED",
   "ORDER_STATUS_CHANGED",
+  "SETTINGS_UPDATED",
 ] as const;
 export type AuditAction = (typeof AUDIT_ACTION)[number];

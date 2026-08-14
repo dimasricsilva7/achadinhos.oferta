@@ -158,11 +158,42 @@ model Order {
   @@index([productId])
 }
 
+// Single-row (id = "singleton") global store configuration — see
+// src/lib/settings-service.ts, which always upserts this row so callers never have to
+// null-check it.
 model Settings {
-  id             String @id @default("singleton")
-  siteName       String @default("Minha Loja")
-  supportContact String?
-  updatedAt      DateTime @updatedAt
+  id String @id @default("singleton")
+
+  siteName        String  @default("Minha Loja")
+  siteShortName   String?
+  siteDescription String?
+  logoUrl         String?
+  faviconUrl      String?
+  socialImageUrl  String?
+  phone           String?
+  whatsapp        String?
+  supportEmail    String?
+  supportContact  String? // legacy free-text contact field, kept for compatibility
+
+  colorPrimary       String @default("#4338ca")
+  colorPrimaryHover  String @default("#3730a3")
+  colorBackground    String @default("#f5f6f8")
+  colorSurface       String @default("#ffffff")
+  colorText          String @default("#14161a")
+  colorTextSecondary String @default("#6b7280")
+  colorBorder        String @default("#e5e7eb")
+  colorPrice         String @default("#dc2626")
+  colorDiscount      String @default("#16a34a")
+  colorOffer         String @default("#d97706")
+
+  footerText  String?
+  footerLinks String? // JSON-encoded [{ label, url }]
+
+  checkoutTitle    String?
+  checkoutSubtitle String?
+  checkoutCta      String?
+
+  updatedAt DateTime @updatedAt
 }
 
 model AuditLog {

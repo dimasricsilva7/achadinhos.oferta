@@ -77,3 +77,38 @@ export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
 });
+
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, "Cor deve estar no formato #RRGGBB");
+const optionalUrl = z.string().url().optional().nullable();
+
+export const settingsUpdateSchema = z.object({
+  siteName: z.string().min(1).max(120),
+  siteShortName: z.string().max(60).optional().nullable(),
+  siteDescription: z.string().max(500).optional().nullable(),
+  logoUrl: optionalUrl,
+  faviconUrl: optionalUrl,
+  socialImageUrl: optionalUrl,
+  phone: z.string().max(40).optional().nullable(),
+  whatsapp: z.string().max(40).optional().nullable(),
+  supportEmail: z.string().email().optional().nullable(),
+
+  colorPrimary: hexColor,
+  colorPrimaryHover: hexColor,
+  colorBackground: hexColor,
+  colorSurface: hexColor,
+  colorText: hexColor,
+  colorTextSecondary: hexColor,
+  colorBorder: hexColor,
+  colorPrice: hexColor,
+  colorDiscount: hexColor,
+  colorOffer: hexColor,
+
+  footerText: z.string().max(500).optional().nullable(),
+  footerLinks: z.array(z.object({ label: z.string().min(1).max(60), url: z.string().url() })).default([]),
+
+  checkoutTitle: z.string().max(120).optional().nullable(),
+  checkoutSubtitle: z.string().max(200).optional().nullable(),
+  checkoutCta: z.string().max(60).optional().nullable(),
+});
+
+export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;

@@ -7,6 +7,7 @@ const LINKS = [
   { href: "/admin", label: "Dashboard", exact: true },
   { href: "/admin/products", label: "Produtos" },
   { href: "/admin/orders", label: "Pedidos" },
+  { href: "/admin/settings", label: "Configurações" },
 ];
 
 export function AdminNav() {
