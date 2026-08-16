@@ -2,6 +2,16 @@ import { notFound } from "next/navigation";
 import { getProductForAdmin } from "@/lib/product-service";
 import { ProductForm } from "@/components/admin/ProductForm";
 
+function parseReviewHighlights(raw: string | null): { label: string; text: string }[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 type Params = { params: Promise<{ id: string }> };
 
 export default async function EditProductPage({ params }: Params) {
@@ -34,6 +44,9 @@ export default async function EditProductPage({ params }: Params) {
           variants: product.variants,
           specifications: product.specifications,
           benefits: product.benefits,
+          addons: product.addons,
+          reviews: product.reviews,
+          reviewHighlights: parseReviewHighlights(product.reviewHighlights),
         }}
       />
     </div>

@@ -25,6 +25,30 @@ export type ProductVariantDTO = {
 export type ProductSpecDTO = { id: string; label: string; value: string };
 export type ProductBenefitDTO = { id: string; icon: string; label: string };
 
+export type ProductAddonDTO = {
+  id: string;
+  title: string;
+  description: string | null;
+  durationLabel: string | null;
+  priceCents: number;
+};
+
+export type ReviewMediaDTO = { id: string; url: string; type: string; thumbnailUrl: string | null };
+
+export type ReviewDTO = {
+  id: string;
+  customerName: string;
+  avatarUrl: string | null;
+  rating: number;
+  variantLabel: string | null;
+  comment: string;
+  helpfulCount: number;
+  createdAtISO: string;
+  media: ReviewMediaDTO[];
+};
+
+export type ReviewHighlightDTO = { label: string; text: string };
+
 export type ProductDTO = {
   id: string;
   slug: string;
@@ -44,6 +68,9 @@ export type ProductDTO = {
   variants: ProductVariantDTO[];
   specifications: ProductSpecDTO[];
   benefits: ProductBenefitDTO[];
+  addons: ProductAddonDTO[];
+  reviews: ReviewDTO[];
+  reviewHighlights: ReviewHighlightDTO[];
 };
 
 type FullProduct = {
@@ -61,11 +88,34 @@ type FullProduct = {
   offerEnabled: boolean;
   offerExpiresAt: Date | null;
   checkoutUrl: string | null;
+  reviewHighlights: string | null;
   images: { id: string; url: string; alt: string; type: string; sortOrder: number; isPrimary: boolean }[];
   variants: { id: string; groupName: string; label: string; imageUrl: string | null; priceCents: number | null; stock: number; checkoutUrl: string | null; sortOrder: number }[];
   specifications: { id: string; label: string; value: string }[];
   benefits: { id: string; icon: string; label: string }[];
+  addons: { id: string; title: string; description: string | null; durationLabel: string | null; priceCents: number; enabled: boolean }[];
+  reviews: {
+    id: string;
+    customerName: string;
+    avatarUrl: string | null;
+    rating: number;
+    variantLabel: string | null;
+    comment: string;
+    helpfulCount: number;
+    createdAt: Date;
+    media: { id: string; url: string; type: string; thumbnailUrl: string | null }[];
+  }[];
 };
+
+function parseReviewHighlights(raw: string | null): ReviewHighlightDTO[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
 
 export function toProductDTO(product: FullProduct): ProductDTO {
   return {
@@ -95,5 +145,26 @@ export function toProductDTO(product: FullProduct): ProductDTO {
     })),
     specifications: product.specifications,
     benefits: product.benefits,
+    addons: product.addons
+      .filter((a) => a.enabled)
+      .map((a) => ({
+        id: a.id,
+        title: a.title,
+        description: a.description,
+        durationLabel: a.durationLabel,
+        priceCents: a.priceCents,
+      })),
+    reviews: product.reviews.map((r) => ({
+      id: r.id,
+      customerName: r.customerName,
+      avatarUrl: r.avatarUrl,
+      rating: r.rating,
+      variantLabel: r.variantLabel,
+      comment: r.comment,
+      helpfulCount: r.helpfulCount,
+      createdAtISO: r.createdAt.toISOString(),
+      media: r.media,
+    })),
+    reviewHighlights: parseReviewHighlights(product.reviewHighlights),
   };
 }

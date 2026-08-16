@@ -56,6 +56,10 @@ async function main() {
       offerEnabled: true,
       offerExpiresAt,
       checkoutUrl: "https://pagseguropix.org/c/produto-teste-checkout",
+      reviewHighlights: JSON.stringify([
+        { label: "Imagem", text: "Na parede cinza ainda ficou bem nítida." },
+        { label: "Uso diário", text: "Cabe fácil na bolsa e aguenta o uso do dia a dia." },
+      ]),
     },
   });
 
@@ -87,6 +91,81 @@ async function main() {
       { productId: product.id, icon: "shield", label: "Compra segura", sortOrder: 1 },
       { productId: product.id, icon: "warranty", label: "Garantia de 7 dias", sortOrder: 2 },
     ],
+  });
+
+  await db.productAddon.createMany({
+    data: [
+      {
+        productId: product.id,
+        title: "Proteção dano e roubo",
+        description: "Cobertura contra danos acidentais e roubo qualificado.",
+        durationLabel: "12 meses",
+        priceCents: 5580,
+        sortOrder: 0,
+        enabled: true,
+      },
+      {
+        productId: product.id,
+        title: "Garantia Estendida",
+        description: "Estende a garantia de fábrica por mais 12 meses.",
+        durationLabel: "12 meses",
+        priceCents: 7632,
+        sortOrder: 1,
+        enabled: true,
+      },
+    ],
+  });
+
+  await db.review.create({
+    data: {
+      productId: product.id,
+      customerName: "Marina Souza",
+      rating: 5,
+      variantLabel: "Multicolorido 1",
+      comment: "Chegou rápido e é exatamente como na foto. As crianças amaram, uso todo dia.",
+      helpfulCount: 12,
+      status: "PUBLISHED",
+      media: {
+        create: [
+          { url: "https://picsum.photos/seed/kit-review-1a/400/400", type: "image", sortOrder: 0 },
+          { url: "https://picsum.photos/seed/kit-review-1b/400/400", type: "image", sortOrder: 1 },
+        ],
+      },
+    },
+  });
+  await db.review.create({
+    data: {
+      productId: product.id,
+      customerName: "Carlos Eduardo",
+      rating: 4,
+      variantLabel: "Multicolorido 2",
+      comment: "Bom custo-benefício. Material parece resistente, só achei o kit um pouco pequeno.",
+      helpfulCount: 5,
+      status: "PUBLISHED",
+      media: {
+        create: [{ url: "https://picsum.photos/seed/kit-review-2a/400/400", type: "image", sortOrder: 0 }],
+      },
+    },
+  });
+  await db.review.create({
+    data: {
+      productId: product.id,
+      customerName: "Ana Paula",
+      rating: 5,
+      comment: "Ajuda muito na hora de acalmar o meu filho durante viagens longas. Recomendo!",
+      helpfulCount: 8,
+      status: "PUBLISHED",
+    },
+  });
+  await db.review.create({
+    data: {
+      productId: product.id,
+      customerName: "Roberto Lima",
+      rating: 3,
+      comment: "Produto ok, mas a entrega demorou mais do que o esperado.",
+      helpfulCount: 1,
+      status: "PUBLISHED",
+    },
   });
 
   console.log(`Produto DEMO criado: /produto/${product.slug}`);

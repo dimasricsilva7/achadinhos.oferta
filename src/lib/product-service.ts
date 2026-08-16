@@ -37,6 +37,25 @@ type VariantWrite = {
 type ImageWrite = { url: string; alt: string; type: string; sortOrder: number; isPrimary: boolean };
 type SpecWrite = { label: string; value: string; sortOrder: number };
 type BenefitWrite = { icon: string; label: string; sortOrder: number };
+type AddonWrite = {
+  title: string;
+  description?: string | null;
+  durationLabel?: string | null;
+  priceCents: number;
+  sortOrder: number;
+  enabled: boolean;
+};
+type ReviewMediaWrite = { url: string; type: string; thumbnailUrl?: string | null; sortOrder: number };
+type ReviewWrite = {
+  customerName: string;
+  avatarUrl?: string | null;
+  rating: number;
+  variantLabel?: string | null;
+  comment: string;
+  helpfulCount: number;
+  status: string;
+  media: ReviewMediaWrite[];
+};
 
 async function syncVariants(productId: string, variants: VariantWrite[]) {
   const existing = await db.productVariant.findMany({ where: { productId } });
@@ -106,6 +125,52 @@ async function replaceBenefits(productId: string, benefits: BenefitWrite[]) {
   });
 }
 
+// Same delete-and-recreate pattern as specs/benefits above — addons have no orders
+// referencing them directly, so no protective diff is needed like syncVariants().
+async function replaceAddons(productId: string, addons: AddonWrite[]) {
+  await db.productAddon.deleteMany({ where: { productId } });
+  if (addons.length === 0) return;
+  await db.productAddon.createMany({
+    data: addons.map((a) => ({
+      productId,
+      title: a.title,
+      description: a.description ?? null,
+      durationLabel: a.durationLabel ?? null,
+      priceCents: a.priceCents,
+      sortOrder: a.sortOrder,
+      enabled: a.enabled,
+    })),
+  });
+}
+
+// Reviews are customer-authored content, not order records — delete-and-recreate is
+// safe here (unlike variants, nothing else references a review by id).
+async function replaceReviews(productId: string, reviews: ReviewWrite[]) {
+  await db.review.deleteMany({ where: { productId } });
+  for (const r of reviews) {
+    await db.review.create({
+      data: {
+        productId,
+        customerName: r.customerName,
+        avatarUrl: r.avatarUrl ?? null,
+        rating: r.rating,
+        variantLabel: r.variantLabel ?? null,
+        comment: r.comment,
+        helpfulCount: r.helpfulCount,
+        status: r.status,
+        media: {
+          create: r.media.map((m) => ({
+            url: m.url,
+            type: m.type,
+            thumbnailUrl: m.thumbnailUrl ?? null,
+            sortOrder: m.sortOrder,
+          })),
+        },
+      },
+    });
+  }
+}
+
 function baseProductData(input: ProductUpsertInput) {
   return {
     name: input.name,
@@ -122,6 +187,7 @@ function baseProductData(input: ProductUpsertInput) {
     offerEnabled: input.offerEnabled,
     offerExpiresAt: input.offerExpiresAt ? new Date(input.offerExpiresAt) : null,
     checkoutUrl: input.checkoutUrl ?? null,
+    reviewHighlights: JSON.stringify(input.reviewHighlights),
   };
 }
 
@@ -141,6 +207,8 @@ export async function createProduct(input: ProductUpsertInput) {
     replaceImages(product.id, input.images),
     replaceSpecs(product.id, input.specifications),
     replaceBenefits(product.id, input.benefits),
+    replaceAddons(product.id, input.addons),
+    replaceReviews(product.id, input.reviews),
   ]);
   await syncVariants(product.id, input.variants);
 
@@ -169,6 +237,8 @@ export async function updateProduct(id: string, input: ProductUpsertInput) {
     replaceImages(id, input.images),
     replaceSpecs(id, input.specifications),
     replaceBenefits(id, input.benefits),
+    replaceAddons(id, input.addons),
+    replaceReviews(id, input.reviews),
   ]);
   await syncVariants(id, input.variants);
 
@@ -199,6 +269,9 @@ export async function duplicateProduct(id: string) {
       offerEnabled: source.offerEnabled,
       offerExpiresAt: source.offerExpiresAt,
       checkoutUrl: null,
+      // Highlights are admin-authored copy about the product, not customer data —
+      // safe (and expected) to carry over, unlike reviews themselves.
+      reviewHighlights: source.reviewHighlights,
     },
   });
 
@@ -227,6 +300,19 @@ export async function duplicateProduct(id: string) {
       sortOrder: v.sortOrder,
     }))
   );
+  // Addons are copied (they're product configuration); reviews are NOT — reviews are
+  // real customer content and must not be fabricated onto an unrelated new product.
+  await replaceAddons(
+    copy.id,
+    source.addons.map((a) => ({
+      title: a.title,
+      description: a.description,
+      durationLabel: a.durationLabel,
+      priceCents: a.priceCents,
+      sortOrder: a.sortOrder,
+      enabled: a.enabled,
+    }))
+  );
 
   return getProductForAdmin(copy.id);
 }
@@ -245,6 +331,11 @@ export function getProductForAdmin(id: string) {
       variants: { orderBy: { sortOrder: "asc" } },
       specifications: { orderBy: { sortOrder: "asc" } },
       benefits: { orderBy: { sortOrder: "asc" } },
+      addons: { orderBy: { sortOrder: "asc" } },
+      reviews: {
+        orderBy: { createdAt: "desc" },
+        include: { media: { orderBy: { sortOrder: "asc" } } },
+      },
     },
   });
 }
@@ -257,6 +348,12 @@ export function getProductBySlugForStorefront(slug: string) {
       variants: { orderBy: { sortOrder: "asc" } },
       specifications: { orderBy: { sortOrder: "asc" } },
       benefits: { orderBy: { sortOrder: "asc" } },
+      addons: { where: { enabled: true }, orderBy: { sortOrder: "asc" } },
+      reviews: {
+        where: { status: "PUBLISHED" },
+        orderBy: { createdAt: "desc" },
+        include: { media: { orderBy: { sortOrder: "asc" } } },
+      },
     },
   });
 }

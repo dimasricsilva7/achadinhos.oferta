@@ -13,11 +13,11 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
   }
-  const { productId, variantId, quantity } = parsed.data;
+  const { productId, variantId, quantity, addonIds } = parsed.data;
 
   const product = await db.product.findUnique({
     where: { id: productId },
-    include: { variants: true },
+    include: { variants: true, addons: true },
   });
 
   if (!product || product.deletedAt || product.status !== "ACTIVE") {
@@ -55,6 +55,12 @@ export async function POST(req: NextRequest) {
   // changes what gets charged, and neither does a manipulated client clock.
   computeOfferState(product);
 
+  // Addons ("Seguros") never take their price from the client — cross-reference the
+  // submitted ids against this product's own enabled addons in the database.
+  const chosenAddons = product.addons.filter((a) => a.enabled && addonIds.includes(a.id));
+  const addonsCents = chosenAddons.reduce((sum, a) => sum + a.priceCents, 0);
+  const addonsSnapshot = chosenAddons.map((a) => ({ id: a.id, title: a.title, priceCents: a.priceCents }));
+
   const order = await db.order.create({
     data: {
       orderNumber: orderNumber(),
@@ -62,7 +68,9 @@ export async function POST(req: NextRequest) {
       variantId: variant?.id ?? null,
       quantity,
       unitPriceCents: effective.priceCents,
-      totalCents: effective.priceCents * quantity,
+      addonsCents,
+      totalCents: effective.priceCents * quantity + addonsCents,
+      addonsSnapshot: addonsSnapshot.length > 0 ? JSON.stringify(addonsSnapshot) : null,
       status: "PENDING",
       checkoutUrl: effective.checkoutUrl,
     },

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PRODUCT_STATUS } from "@/lib/constants";
+import { PRODUCT_STATUS, REVIEW_STATUS } from "@/lib/constants";
 import { centsToReaisInput, reaisInputToCents } from "@/lib/money";
 
 type ImageRow = { id?: string; url: string; alt: string; type: string; sortOrder: number; isPrimary: boolean };
@@ -19,6 +19,28 @@ type VariantRow = {
 };
 type SpecRow = { id?: string; label: string; value: string; sortOrder: number };
 type BenefitRow = { id?: string; icon: string; label: string; sortOrder: number };
+type AddonRow = {
+  id?: string;
+  title: string;
+  description: string;
+  durationLabel: string;
+  priceCents: number | null;
+  sortOrder: number;
+  enabled: boolean;
+};
+type ReviewMediaRow = { id?: string; url: string; type: string; thumbnailUrl: string; sortOrder: number };
+type ReviewRow = {
+  id?: string;
+  customerName: string;
+  avatarUrl: string;
+  rating: number;
+  variantLabel: string;
+  comment: string;
+  helpfulCount: number;
+  status: string;
+  media: ReviewMediaRow[];
+};
+type ReviewHighlightRow = { label: string; text: string };
 
 export type ProductFormInitial = {
   id?: string;
@@ -41,9 +63,32 @@ export type ProductFormInitial = {
   variants: { id: string; groupName: string; label: string; sku: string | null; imageUrl: string | null; priceCents: number | null; stock: number; checkoutUrl: string | null; sortOrder: number }[];
   specifications: SpecRow[];
   benefits: BenefitRow[];
+  addons: { id: string; title: string; description: string | null; durationLabel: string | null; priceCents: number; sortOrder: number; enabled: boolean }[];
+  reviews: {
+    id: string;
+    customerName: string;
+    avatarUrl: string | null;
+    rating: number;
+    variantLabel: string | null;
+    comment: string;
+    helpfulCount: number;
+    status: string;
+    media: { id: string; url: string; type: string; thumbnailUrl: string | null; sortOrder: number }[];
+  }[];
+  reviewHighlights: ReviewHighlightRow[];
 };
 
-const TABS = ["Geral", "Preços & Oferta", "Imagens", "Variações", "Especificações", "Benefícios", "Checkout"] as const;
+const TABS = [
+  "Geral",
+  "Preços & Oferta",
+  "Imagens",
+  "Variações",
+  "Especificações",
+  "Benefícios",
+  "Seguros",
+  "Avaliações",
+  "Checkout",
+] as const;
 
 function toLocalDatetimeInput(iso: string | null): string {
   if (!iso) return "";
@@ -89,6 +134,37 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
   );
   const [specifications, setSpecifications] = useState<SpecRow[]>(initial?.specifications ?? []);
   const [benefits, setBenefits] = useState<BenefitRow[]>(initial?.benefits ?? []);
+  const [addons, setAddons] = useState<AddonRow[]>(
+    (initial?.addons ?? []).map((a) => ({
+      id: a.id,
+      title: a.title,
+      description: a.description ?? "",
+      durationLabel: a.durationLabel ?? "",
+      priceCents: a.priceCents,
+      sortOrder: a.sortOrder,
+      enabled: a.enabled,
+    }))
+  );
+  const [reviews, setReviews] = useState<ReviewRow[]>(
+    (initial?.reviews ?? []).map((r) => ({
+      id: r.id,
+      customerName: r.customerName,
+      avatarUrl: r.avatarUrl ?? "",
+      rating: r.rating,
+      variantLabel: r.variantLabel ?? "",
+      comment: r.comment,
+      helpfulCount: r.helpfulCount,
+      status: r.status,
+      media: r.media.map((m) => ({
+        id: m.id,
+        url: m.url,
+        type: m.type,
+        thumbnailUrl: m.thumbnailUrl ?? "",
+        sortOrder: m.sortOrder,
+      })),
+    }))
+  );
+  const [reviewHighlights, setReviewHighlights] = useState<ReviewHighlightRow[]>(initial?.reviewHighlights ?? []);
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -153,6 +229,19 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
       })),
       specifications,
       benefits,
+      addons: addons.map((a) => ({
+        ...a,
+        description: a.description || null,
+        durationLabel: a.durationLabel || null,
+        priceCents: a.priceCents ?? 0,
+      })),
+      reviews: reviews.map((r) => ({
+        ...r,
+        avatarUrl: r.avatarUrl || null,
+        variantLabel: r.variantLabel || null,
+        media: r.media.map((m) => ({ ...m, thumbnailUrl: m.thumbnailUrl || null })),
+      })),
+      reviewHighlights,
     };
 
     const url = initial?.id ? `/api/admin/products/${initial.id}` : "/api/admin/products";
@@ -376,6 +465,188 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
           >
             + Adicionar benefício
           </button>
+        </div>
+      )}
+
+      {tab === "Seguros" && (
+        <div className="flex flex-col gap-3">
+          {addons.map((a, i) => (
+            <div key={i} className="grid grid-cols-2 gap-2 rounded-lg border border-border p-3 md:grid-cols-4">
+              <input placeholder="Título (ex: Proteção dano e roubo)" value={a.title} onChange={(e) => updateAt(setAddons, i, { title: e.target.value })} className="input col-span-2" />
+              <input placeholder="Duração (ex: 12 meses)" value={a.durationLabel} onChange={(e) => updateAt(setAddons, i, { durationLabel: e.target.value })} className="input" />
+              <input
+                placeholder="Preço (R$)"
+                value={a.priceCents !== null ? centsToReaisInput(a.priceCents) : ""}
+                onChange={(e) => updateAt(setAddons, i, { priceCents: reaisInputToCents(e.target.value) })}
+                className="input"
+              />
+              <input placeholder="Descrição (opcional)" value={a.description} onChange={(e) => updateAt(setAddons, i, { description: e.target.value })} className="input col-span-full" />
+              <label className="col-span-2 flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={a.enabled} onChange={(e) => updateAt(setAddons, i, { enabled: e.target.checked })} />
+                Ativo
+              </label>
+              <button type="button" onClick={() => setAddons((prev) => prev.filter((_, idx) => idx !== i))} className="col-span-full text-left text-xs text-price">
+                Remover seguro
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={() =>
+              setAddons((prev) => [
+                ...prev,
+                { title: "", description: "", durationLabel: "", priceCents: null, sortOrder: prev.length, enabled: true },
+              ])
+            }
+            className="w-fit rounded-lg border border-dashed border-border px-3 py-2 text-sm text-foreground/60 hover:border-brand hover:text-brand"
+          >
+            + Adicionar seguro
+          </button>
+        </div>
+      )}
+
+      {tab === "Avaliações" && (
+        <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-3">
+            <p className="text-sm font-medium text-foreground/80">Resumo das avaliações (bullets exibidos na loja)</p>
+            {reviewHighlights.map((h, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  placeholder="Rótulo (ex: Imagem)"
+                  value={h.label}
+                  onChange={(e) => updateAt(setReviewHighlights, i, { label: e.target.value })}
+                  className="input w-40"
+                />
+                <input
+                  placeholder="Texto"
+                  value={h.text}
+                  onChange={(e) => updateAt(setReviewHighlights, i, { text: e.target.value })}
+                  className="input"
+                />
+                <button type="button" onClick={() => setReviewHighlights((prev) => prev.filter((_, idx) => idx !== i))} className="text-xs text-price">
+                  Remover
+                </button>
+              </div>
+            ))}
+            {reviewHighlights.length < 6 && (
+              <button
+                type="button"
+                onClick={() => setReviewHighlights((prev) => [...prev, { label: "", text: "" }])}
+                className="w-fit rounded-lg border border-dashed border-border px-3 py-2 text-sm text-foreground/60 hover:border-brand hover:text-brand"
+              >
+                + Adicionar bullet
+              </button>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-3 border-t border-border pt-4">
+            <p className="text-sm font-medium text-foreground/80">Avaliações de clientes</p>
+            {reviews.map((r, i) => (
+              <div key={i} className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                  <input placeholder="Nome do cliente" value={r.customerName} onChange={(e) => updateAt(setReviews, i, { customerName: e.target.value })} className="input" />
+                  <select value={r.rating} onChange={(e) => updateAt(setReviews, i, { rating: Number(e.target.value) })} className="input">
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {n} estrela{n > 1 ? "s" : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <input placeholder="Variação (opcional)" value={r.variantLabel} onChange={(e) => updateAt(setReviews, i, { variantLabel: e.target.value })} className="input" />
+                  <select value={r.status} onChange={(e) => updateAt(setReviews, i, { status: e.target.value })} className="input">
+                    {REVIEW_STATUS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <input placeholder="URL do avatar (opcional)" value={r.avatarUrl} onChange={(e) => updateAt(setReviews, i, { avatarUrl: e.target.value })} className="input" />
+                <textarea placeholder="Comentário" value={r.comment} onChange={(e) => updateAt(setReviews, i, { comment: e.target.value })} rows={3} className="input" />
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Útil (contagem)"
+                  value={r.helpfulCount}
+                  onChange={(e) => updateAt(setReviews, i, { helpfulCount: Number(e.target.value) })}
+                  className="input w-40"
+                />
+
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-medium text-foreground/60">Mídia (URLs)</p>
+                  {r.media.map((m, mi) => (
+                    <div key={mi} className="flex gap-2">
+                      <input
+                        placeholder="URL da imagem/vídeo"
+                        value={m.url}
+                        onChange={(e) => {
+                          const media = r.media.map((row, idx) => (idx === mi ? { ...row, url: e.target.value } : row));
+                          updateAt(setReviews, i, { media });
+                        }}
+                        className="input"
+                      />
+                      <select
+                        value={m.type}
+                        onChange={(e) => {
+                          const media = r.media.map((row, idx) => (idx === mi ? { ...row, type: e.target.value } : row));
+                          updateAt(setReviews, i, { media });
+                        }}
+                        className="input w-28"
+                      >
+                        <option value="image">Imagem</option>
+                        <option value="video">Vídeo</option>
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const media = r.media.filter((_, idx) => idx !== mi);
+                          updateAt(setReviews, i, { media });
+                        }}
+                        className="text-xs text-price"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const media = [...r.media, { url: "", type: "image", thumbnailUrl: "", sortOrder: r.media.length }];
+                      updateAt(setReviews, i, { media });
+                    }}
+                    className="w-fit text-xs text-brand"
+                  >
+                    + Adicionar mídia
+                  </button>
+                </div>
+
+                <button type="button" onClick={() => setReviews((prev) => prev.filter((_, idx) => idx !== i))} className="w-fit text-left text-xs text-price">
+                  Remover avaliação
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() =>
+                setReviews((prev) => [
+                  ...prev,
+                  {
+                    customerName: "",
+                    avatarUrl: "",
+                    rating: 5,
+                    variantLabel: "",
+                    comment: "",
+                    helpfulCount: 0,
+                    status: "PUBLISHED",
+                    media: [],
+                  },
+                ])
+              }
+              className="w-fit rounded-lg border border-dashed border-border px-3 py-2 text-sm text-foreground/60 hover:border-brand hover:text-brand"
+            >
+              + Adicionar avaliação
+            </button>
+          </div>
         </div>
       )}
 

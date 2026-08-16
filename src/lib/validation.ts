@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { PRODUCT_STATUS, ADMIN_SETTABLE_ORDER_STATUS } from "@/lib/constants";
+import { PRODUCT_STATUS, ADMIN_SETTABLE_ORDER_STATUS, REVIEW_STATUS } from "@/lib/constants";
 
 export const productImageInput = z.object({
   id: z.string().optional(),
@@ -36,6 +36,41 @@ export const productBenefitInput = z.object({
   sortOrder: z.number().int().default(0),
 });
 
+export const productAddonInput = z.object({
+  id: z.string().optional(),
+  title: z.string().min(1),
+  description: z.string().max(500).optional().nullable(),
+  durationLabel: z.string().max(60).optional().nullable(),
+  priceCents: z.number().int().positive(),
+  sortOrder: z.number().int().default(0),
+  enabled: z.boolean().default(true),
+});
+
+export const reviewMediaInput = z.object({
+  id: z.string().optional(),
+  url: z.string().min(1),
+  type: z.enum(["image", "video"]).default("image"),
+  thumbnailUrl: z.string().optional().nullable(),
+  sortOrder: z.number().int().default(0),
+});
+
+export const reviewInput = z.object({
+  id: z.string().optional(),
+  customerName: z.string().min(1).max(120),
+  avatarUrl: z.string().optional().nullable(),
+  rating: z.number().int().min(1).max(5),
+  variantLabel: z.string().max(120).optional().nullable(),
+  comment: z.string().min(1).max(4000),
+  helpfulCount: z.number().int().min(0).default(0),
+  status: z.enum(REVIEW_STATUS).default("PUBLISHED"),
+  media: z.array(reviewMediaInput).default([]),
+});
+
+export const reviewHighlightInput = z.object({
+  label: z.string().min(1).max(60),
+  text: z.string().min(1).max(300),
+});
+
 export const productUpsertSchema = z.object({
   slug: z
     .string()
@@ -59,6 +94,9 @@ export const productUpsertSchema = z.object({
   variants: z.array(productVariantInput).default([]),
   specifications: z.array(productSpecInput).default([]),
   benefits: z.array(productBenefitInput).default([]),
+  addons: z.array(productAddonInput).default([]),
+  reviews: z.array(reviewInput).default([]),
+  reviewHighlights: z.array(reviewHighlightInput).max(6).default([]),
 });
 
 export type ProductUpsertInput = z.infer<typeof productUpsertSchema>;
@@ -67,6 +105,7 @@ export const checkoutStartSchema = z.object({
   productId: z.string().min(1),
   variantId: z.string().min(1).optional().nullable(),
   quantity: z.number().int().positive().max(999),
+  addonIds: z.array(z.string()).default([]),
 });
 
 export const orderStatusUpdateSchema = z.object({

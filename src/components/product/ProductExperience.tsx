@@ -6,13 +6,15 @@ import { ProductHeader } from "@/components/product/ProductHeader";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { OfferBanner } from "@/components/product/OfferBanner";
 import { PriceBlock } from "@/components/product/PriceBlock";
-import { SoldBadge, RatingSummary } from "@/components/product/RatingSold";
+import { SoldBadge } from "@/components/product/RatingSold";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { Benefits } from "@/components/product/Benefits";
 import { Description } from "@/components/product/Description";
 import { Specifications } from "@/components/product/Specifications";
 import { StickyBuyBar } from "@/components/product/StickyBuyBar";
+import { PurchaseSheet } from "@/components/product/PurchaseSheet";
+import { ReviewsSection } from "@/components/product/ReviewsSection";
 import { discountPercent } from "@/lib/money";
 
 export function ProductExperience({ product }: { product: ProductDTO }) {
@@ -25,6 +27,8 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
   const [quantity, setQuantity] = useState(1);
   const [buyState, setBuyState] = useState<"idle" | "loading" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>([]);
 
   const selectedVariant = useMemo(
     () => product.variants.find((v) => v.id === selectedVariantId) ?? null,
@@ -36,6 +40,14 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
   const effectiveStock = selectedVariant ? selectedVariant.stock : product.stock;
   const effectiveImageUrl = selectedVariant?.imageUrl ?? null;
 
+  const addonsCents = useMemo(
+    () =>
+      product.addons
+        .filter((a) => selectedAddonIds.includes(a.id))
+        .reduce((sum, a) => sum + a.priceCents, 0),
+    [product.addons, selectedAddonIds]
+  );
+
   const outOfStock = effectiveStock <= 0;
   const missingVariant = requiresVariant && !selectedVariantId;
 
@@ -43,6 +55,10 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
   if (missingVariant) disabledReason = "Selecione uma variação";
   else if (outOfStock) disabledReason = "Esgotado";
   else if (!product.hasCheckout) disabledReason = "Indisponível para compra";
+
+  function toggleAddon(id: string) {
+    setSelectedAddonIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function handleBuy() {
     setErrorMessage(null);
@@ -55,6 +71,7 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
           productId: product.id,
           variantId: selectedVariantId,
           quantity,
+          addonIds: selectedAddonIds,
         }),
       });
       const data = await res.json();
@@ -106,13 +123,40 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
         <Benefits benefits={product.benefits} />
         <Description text={product.description} />
         <Specifications specs={product.specifications} />
-        <RatingSummary ratingAverage={product.ratingAverage} ratingCount={product.ratingCount} />
+        <ReviewsSection
+          reviews={product.reviews}
+          ratingAverage={product.ratingAverage}
+          ratingCount={product.ratingCount}
+          reviewHighlights={product.reviewHighlights}
+        />
       </div>
 
       <div className="h-2" />
 
       <StickyBuyBar
-        totalCents={effectivePriceCents * quantity}
+        totalCents={effectivePriceCents * quantity + addonsCents}
+        disabled={Boolean(disabledReason)}
+        disabledReason={disabledReason}
+        state={buyState}
+        errorMessage={errorMessage}
+        onBuy={() => setIsSheetOpen(true)}
+      />
+
+      <PurchaseSheet
+        open={isSheetOpen}
+        onClose={() => setIsSheetOpen(false)}
+        product={product}
+        imageUrl={effectiveImageUrl}
+        priceCents={effectivePriceCents}
+        compareAtPriceCents={effectiveCompareAtPriceCents}
+        stock={effectiveStock}
+        selectedVariantId={selectedVariantId}
+        onSelectVariant={setSelectedVariantId}
+        quantity={quantity}
+        onQuantityChange={setQuantity}
+        selectedAddonIds={selectedAddonIds}
+        onToggleAddon={toggleAddon}
+        totalCents={effectivePriceCents * quantity + addonsCents}
         disabled={Boolean(disabledReason)}
         disabledReason={disabledReason}
         state={buyState}
