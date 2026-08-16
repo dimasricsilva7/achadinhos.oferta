@@ -236,8 +236,8 @@ model Settings {
   supportEmail    String?
   supportContact  String? // legacy free-text contact field, kept for compatibility
 
-  colorPrimary       String @default("#4338ca")
-  colorPrimaryHover  String @default("#3730a3")
+  colorPrimary       String @default("#F2790F")
+  colorPrimaryHover  String @default("#D6650A")
   colorBackground    String @default("#f5f6f8")
   colorSurface       String @default("#ffffff")
   colorText          String @default("#14161a")
@@ -245,7 +245,7 @@ model Settings {
   colorBorder        String @default("#e5e7eb")
   colorPrice         String @default("#dc2626")
   colorDiscount      String @default("#16a34a")
-  colorOffer         String @default("#d97706")
+  colorOffer         String @default("#E8590C")
 
   footerText  String?
   footerLinks String? // JSON-encoded [{ label, url }]

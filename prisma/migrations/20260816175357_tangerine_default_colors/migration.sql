@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Settings" ALTER COLUMN "colorOffer" SET DEFAULT '#E8590C',
+ALTER COLUMN "colorPrimary" SET DEFAULT '#F2790F',
+ALTER COLUMN "colorPrimaryHover" SET DEFAULT '#D6650A';

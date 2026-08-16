@@ -6,12 +6,13 @@
   --surface: #ffffff;
   --border: #e5e7eb;
 
-  /* Original brand identity — intentionally not Shopee's orange/white palette. */
-  --brand: #4338ca;
-  --brand-dark: #3730a3;
+  /* Default brand palette — overridden live per-site by Settings.colorPrimary etc.
+     (src/app/layout.tsx). These are just the fallback before that loads. */
+  --brand: #f2790f;
+  --brand-dark: #d6650a;
   --price: #dc2626;
   --success: #16a34a;
-  --warning: #d97706;
+  --warning: #e8590c;
   --star: #f59e0b;
 
   --radius-card: 0.75rem;
