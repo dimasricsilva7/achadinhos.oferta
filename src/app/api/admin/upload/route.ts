@@ -42,9 +42,14 @@ export async function POST(req: NextRequest) {
     const blob = await put(`products/${filename}`, bytes, {
       access: "public",
       contentType: file.type,
+      // Passed explicitly rather than relying on ambient OIDC auto-detection —
+      // this project has OIDC enabled but not consistently across environments,
+      // which made @vercel/blob's implicit auth resolution fail.
+      token: process.env.BLOB_READ_WRITE_TOKEN,
     });
     return NextResponse.json({ url: blob.url }, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Blob upload failed:", err);
     return NextResponse.json(
       { error: "Falha ao enviar imagem. Verifique se o armazenamento (Vercel Blob) está configurado." },
       { status: 500 }
