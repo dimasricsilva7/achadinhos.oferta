@@ -13,12 +13,16 @@ datasource db {
 }
 
 model Admin {
-  id           String   @id @default(cuid())
-  email        String   @unique
+  id           String    @id @default(cuid())
+  email        String    @unique
   passwordHash String
   name         String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  // Updated on every successful login (see src/app/api/admin/login/route.ts). Used
+  // only to derive a real "Ativo há X min" readout on the storefront StoreInfo block
+  // — never fabricated, and omitted from the UI entirely when null.
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   auditLogs AuditLog[]
 }
@@ -271,6 +275,20 @@ model Settings {
   checkoutTitle    String?
   checkoutSubtitle String?
   checkoutCta      String?
+
+  // "Store info" block — this is a single-store project (no multi-vendor model), so
+  // these describe the store as a whole and render on every product page, sourced
+  // from this singleton rather than per-product data.
+  storeLogoUrl              String?
+  storeRatingAverage        Float    @default(0)
+  storeRatingCount          Int      @default(0)
+  // If null, product count is computed dynamically (count of ACTIVE, non-deleted
+  // products) instead of asking the admin to keep a number in sync by hand.
+  storeProductCount         Int?
+  storeResponseRatePercent  Int      @default(100)
+  // Free-text badge label (e.g. "Indicado") — configurable, never hardcoded copy.
+  storeBadgeLabel           String?
+  storeBadgeEnabled         Boolean  @default(false)
 
   updatedAt DateTime @updatedAt
 }

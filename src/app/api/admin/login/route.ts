@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
   }
 
   await setSessionCookie({ adminId: admin.id, email: admin.email });
+  await db.admin.update({ where: { id: admin.id }, data: { lastLoginAt: new Date() } });
   await logAudit({ adminId: admin.id, action: "ADMIN_LOGIN", entity: "Admin", entityId: admin.id });
 
   return NextResponse.json({ ok: true });

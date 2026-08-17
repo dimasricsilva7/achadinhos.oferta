@@ -2,13 +2,19 @@ import { formatCentsBRL } from "@/lib/money";
 
 type BuyState = "idle" | "loading" | "error";
 
+// WhatsApp's own official green — not sampled from any marketplace's palette. It's
+// used here because it labels a chat/WhatsApp icon that already existed in this bar,
+// so reusing WhatsApp's real brand color for that icon is the honest choice, not an
+// attempt to look like a specific competitor (see project note in AGENTS.md history).
+const WHATSAPP_GREEN = "#25D366";
+
 function IconButton({ label, onClick, children }: { label: string; onClick?: () => void; children: React.ReactNode }) {
   return (
     <button
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-foreground/70 transition-colors duration-150 hover:bg-neutral-200 active:bg-neutral-300"
+      className="flex h-full flex-1 items-center justify-center text-white transition-colors duration-150 active:brightness-95"
     >
       {children}
     </button>
@@ -31,30 +37,37 @@ export function StickyBuyBar({
   onBuy: () => void;
 }) {
   return (
-    <div className="safe-bottom sticky bottom-0 z-30 border-t border-border bg-surface/95 px-3 py-2 backdrop-blur">
+    <div className="safe-bottom sticky bottom-0 z-30 bg-surface/95 backdrop-blur">
       {errorMessage && (
-        <p role="alert" className="mb-1.5 text-center text-xs font-medium text-price">
+        <p role="alert" className="px-3 pt-1.5 text-center text-xs font-medium text-price">
           {errorMessage}
         </p>
       )}
-      <div className="flex items-center gap-2">
-        <IconButton label="Conversar com o vendedor">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </IconButton>
-        <IconButton label="Ver compra" onClick={onBuy}>
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 6h15l-1.5 9h-12L5 3H2" strokeLinecap="round" strokeLinejoin="round" />
-            <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
-            <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
-          </svg>
-        </IconButton>
+      {/* Cantos 100% retos (sem border-radius), largura total, dividido em duas
+          seções de cor: esquerda (verde WhatsApp, ícones) e direita (tangerina, CTA). */}
+      <div className="flex h-14 w-full items-stretch">
+        <div className="flex items-stretch" style={{ backgroundColor: WHATSAPP_GREEN }}>
+          <IconButton label="Conversar com o vendedor">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </IconButton>
+          {/* Separador vertical fino translúcido entre os dois ícones */}
+          <span className="my-2.5 w-px bg-white/35" aria-hidden="true" />
+          <IconButton label="Ver compra" onClick={onBuy}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M6 6h15l-1.5 9h-12L5 3H2" strokeLinecap="round" strokeLinejoin="round" />
+              <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
+              <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
+            </svg>
+          </IconButton>
+        </div>
+
         <button
           type="button"
           onClick={onBuy}
           disabled={disabled || state === "loading"}
-          className="flex h-12 flex-1 flex-col items-center justify-center rounded-lg bg-brand leading-tight text-white transition-colors duration-150 active:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
+          className="flex flex-1 flex-col items-center justify-center bg-brand leading-tight text-white transition-colors duration-150 active:brightness-95 disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
         >
           {state === "loading" ? (
             <span className="text-sm font-semibold">Processando…</span>

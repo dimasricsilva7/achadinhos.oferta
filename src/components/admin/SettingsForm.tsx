@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FooterLink } from "@/lib/settings-service";
 
-const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout"] as const;
+const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout", "Loja"] as const;
 
 export type SettingsFormInitial = {
   siteName: string;
@@ -33,12 +33,20 @@ export type SettingsFormInitial = {
   checkoutTitle: string | null;
   checkoutSubtitle: string | null;
   checkoutCta: string | null;
+
+  storeLogoUrl: string | null;
+  storeRatingAverage: number;
+  storeRatingCount: number;
+  storeProductCount: number | null;
+  storeResponseRatePercent: number;
+  storeBadgeLabel: string | null;
+  storeBadgeEnabled: boolean;
 };
 
 type SaveState = "idle" | "saving" | "success" | "error";
 
 export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
-  const [uploadingField, setUploadingField] = useState<"logoUrl" | "faviconUrl" | "socialImageUrl" | null>(null);
+  const [uploadingField, setUploadingField] = useState<"logoUrl" | "faviconUrl" | "socialImageUrl" | "storeLogoUrl" | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Identidade");
 
   const [siteName, setSiteName] = useState(initial.siteName);
@@ -69,10 +77,20 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
   const [checkoutSubtitle, setCheckoutSubtitle] = useState(initial.checkoutSubtitle ?? "");
   const [checkoutCta, setCheckoutCta] = useState(initial.checkoutCta ?? "");
 
+  const [storeLogoUrl, setStoreLogoUrl] = useState(initial.storeLogoUrl ?? "");
+  const [storeRatingAverage, setStoreRatingAverage] = useState(initial.storeRatingAverage);
+  const [storeRatingCount, setStoreRatingCount] = useState(initial.storeRatingCount);
+  const [storeProductCount, setStoreProductCount] = useState(
+    initial.storeProductCount !== null ? String(initial.storeProductCount) : ""
+  );
+  const [storeResponseRatePercent, setStoreResponseRatePercent] = useState(initial.storeResponseRatePercent);
+  const [storeBadgeLabel, setStoreBadgeLabel] = useState(initial.storeBadgeLabel ?? "");
+  const [storeBadgeEnabled, setStoreBadgeEnabled] = useState(initial.storeBadgeEnabled);
+
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
 
-  async function handleUpload(field: "logoUrl" | "faviconUrl" | "socialImageUrl", file: File) {
+  async function handleUpload(field: "logoUrl" | "faviconUrl" | "socialImageUrl" | "storeLogoUrl", file: File) {
     setUploadingField(field);
     setError(null);
     try {
@@ -87,6 +105,7 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
       if (field === "logoUrl") setLogoUrl(data.url);
       if (field === "faviconUrl") setFaviconUrl(data.url);
       if (field === "socialImageUrl") setSocialImageUrl(data.url);
+      if (field === "storeLogoUrl") setStoreLogoUrl(data.url);
     } finally {
       setUploadingField(null);
     }
@@ -122,6 +141,13 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
       checkoutTitle: checkoutTitle || null,
       checkoutSubtitle: checkoutSubtitle || null,
       checkoutCta: checkoutCta || null,
+      storeLogoUrl: storeLogoUrl || null,
+      storeRatingAverage: Number(storeRatingAverage),
+      storeRatingCount: Number(storeRatingCount),
+      storeProductCount: storeProductCount.trim() === "" ? null : Number(storeProductCount),
+      storeResponseRatePercent: Number(storeResponseRatePercent),
+      storeBadgeLabel: storeBadgeLabel || null,
+      storeBadgeEnabled,
     };
 
     const res = await fetch("/api/admin/settings", {
@@ -280,6 +306,76 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
           <Field label="Texto do botão (CTA)">
             <input value={checkoutCta} onChange={(e) => setCheckoutCta(e.target.value)} className="input" />
           </Field>
+        </div>
+      )}
+
+      {tab === "Loja" && (
+        <div className="flex flex-col gap-4">
+          <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+            Este bloco descreve a loja como um todo (não um produto específico) e aparece na página de qualquer
+            produto. O nome usado é o &quot;Nome da loja&quot; da aba Identidade.
+          </p>
+          <ImageField
+            label="Logo da loja (circular)"
+            url={storeLogoUrl}
+            uploading={uploadingField === "storeLogoUrl"}
+            onUpload={(f) => handleUpload("storeLogoUrl", f)}
+            onClear={() => setStoreLogoUrl("")}
+          />
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Nota média (0-5)">
+              <input
+                type="number"
+                min={0}
+                max={5}
+                step={0.1}
+                value={storeRatingAverage}
+                onChange={(e) => setStoreRatingAverage(Number(e.target.value))}
+                className="input"
+              />
+            </Field>
+            <Field label="Nº de avaliações">
+              <input
+                type="number"
+                min={0}
+                value={storeRatingCount}
+                onChange={(e) => setStoreRatingCount(Number(e.target.value))}
+                className="input"
+              />
+            </Field>
+          </div>
+          <Field label="Quantidade de produtos (opcional — vazio calcula automaticamente pelos produtos ativos)">
+            <input
+              type="number"
+              min={0}
+              placeholder="Automático"
+              value={storeProductCount}
+              onChange={(e) => setStoreProductCount(e.target.value)}
+              className="input"
+            />
+          </Field>
+          <Field label="Taxa de resposta (%)">
+            <input
+              type="number"
+              min={0}
+              max={100}
+              value={storeResponseRatePercent}
+              onChange={(e) => setStoreResponseRatePercent(Number(e.target.value))}
+              className="input"
+            />
+          </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={storeBadgeEnabled} onChange={(e) => setStoreBadgeEnabled(e.target.checked)} />
+            Mostrar selo ao lado do nome da loja
+          </label>
+          {storeBadgeEnabled && (
+            <Field label='Texto do selo (ex.: "Indicado")'>
+              <input value={storeBadgeLabel} onChange={(e) => setStoreBadgeLabel(e.target.value)} className="input" />
+            </Field>
+          )}
+          <p className="text-xs text-foreground/50">
+            &quot;Ativo há X&quot; é calculado a partir do último login real de um admin — não é configurável aqui.
+          </p>
         </div>
       )}
 

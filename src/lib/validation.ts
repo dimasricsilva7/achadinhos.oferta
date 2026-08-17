@@ -159,6 +159,14 @@ export const settingsUpdateSchema = z.object({
   checkoutTitle: z.string().max(120).optional().nullable(),
   checkoutSubtitle: z.string().max(200).optional().nullable(),
   checkoutCta: z.string().max(60).optional().nullable(),
+
+  storeLogoUrl: optionalUrl,
+  storeRatingAverage: z.number().min(0).max(5).default(0),
+  storeRatingCount: z.number().int().min(0).default(0),
+  storeProductCount: z.number().int().min(0).optional().nullable(),
+  storeResponseRatePercent: z.number().int().min(0).max(100).default(100),
+  storeBadgeLabel: z.string().max(40).optional().nullable(),
+  storeBadgeEnabled: z.boolean().default(false),
 });
 
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;

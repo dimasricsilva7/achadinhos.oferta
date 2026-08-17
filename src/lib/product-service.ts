@@ -354,6 +354,22 @@ export function getProductForAdmin(id: string) {
   });
 }
 
+// "Produtos da mesma loja" — this is a single-store project (no multi-vendor
+// model), so "same store" just means any other published product. Used by the
+// StoreInfo block on the product page.
+export function getRelatedStoreProducts(excludeProductId: string, limit = 8) {
+  return db.product.findMany({
+    where: { status: "ACTIVE", deletedAt: null, id: { not: excludeProductId } },
+    orderBy: { soldCount: "desc" },
+    take: limit,
+    include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
+  });
+}
+
+export function countActiveProducts() {
+  return db.product.count({ where: { status: "ACTIVE", deletedAt: null } });
+}
+
 export function getProductBySlugForStorefront(slug: string) {
   return db.product.findFirst({
     where: { slug, status: "ACTIVE", deletedAt: null },

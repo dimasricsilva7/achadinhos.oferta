@@ -23,8 +23,23 @@ async function main() {
 
   await db.settings.upsert({
     where: { id: "singleton" },
-    update: {},
-    create: { id: "singleton", siteName: "Minha Loja" },
+    update: {
+      storeRatingAverage: 4.9,
+      storeRatingCount: 15234,
+      storeResponseRatePercent: 98,
+      storeBadgeLabel: "Indicado",
+      storeBadgeEnabled: true,
+    },
+    create: {
+      id: "singleton",
+      siteName: "Minha Loja",
+      storeRatingAverage: 4.9,
+      storeRatingCount: 15234,
+      storeResponseRatePercent: 98,
+      storeBadgeLabel: "Indicado",
+      storeBadgeEnabled: true,
+      // storeProductCount left null on purpose — computed dynamically from ACTIVE products.
+    },
   });
 
   // DEMO product — clearly labeled, safe to delete from the admin panel at any time.
@@ -76,6 +91,10 @@ async function main() {
   await db.productImage.createMany({
     data: [
       { productId: product.id, url: "", alt: "Kit sensorial de bolso", sortOrder: 0, isPrimary: true },
+      // Public demo video (W3Schools sample asset, small MP4) used only to exercise
+      // the video-in-gallery rendering path (Refinamento 3) end-to-end in dev/demo —
+      // swap for a real product video before going live.
+      { productId: product.id, url: "https://www.w3schools.com/html/mov_bbb.mp4", alt: "Vídeo demonstrativo do kit", type: "video", sortOrder: 1, isPrimary: false },
     ],
   });
 
@@ -130,6 +149,10 @@ async function main() {
     data: {
       productId: product.id,
       customerName: "Marina Souza",
+      // https://i.pravatar.cc/ — generic placeholder person photos, used only for
+      // seed/demo data so ReviewCard's avatarUrl path (Refinamento 7) has something
+      // real to render besides the initials fallback.
+      avatarUrl: "https://i.pravatar.cc/150?img=47",
       rating: 5,
       variantLabel: "Multicolorido 1",
       comment: "Chegou rápido e é exatamente como na foto. As crianças amaram, uso todo dia.",

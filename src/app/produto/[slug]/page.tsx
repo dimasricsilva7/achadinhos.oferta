@@ -1,8 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getProductBySlugForStorefront } from "@/lib/product-service";
-import { toProductDTO } from "@/lib/product-dto";
+import { getProductBySlugForStorefront, getRelatedStoreProducts, countActiveProducts } from "@/lib/product-service";
+import { toProductDTO, toRelatedProductDTO } from "@/lib/product-dto";
 import { ProductExperience } from "@/components/product/ProductExperience";
+import { getSettings } from "@/lib/settings-service";
+import { getMostRecentAdminLoginAt } from "@/lib/auth";
+import { formatActiveAgoLabel } from "@/lib/time-ago";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -32,5 +35,32 @@ export default async function ProductPage({ params }: Params) {
 
   if (!product) notFound();
 
-  return <ProductExperience product={toProductDTO(product)} />;
+  const [settings, relatedProducts, lastLoginAt] = await Promise.all([
+    getSettings(),
+    getRelatedStoreProducts(product.id),
+    getMostRecentAdminLoginAt(),
+  ]);
+
+  // Only queries the live count when the admin hasn't set a manual storeProductCount.
+  const productCount = settings.storeProductCount ?? (await countActiveProducts());
+
+  const store = {
+    logoUrl: settings.storeLogoUrl,
+    name: settings.siteName,
+    badgeLabel: settings.storeBadgeLabel,
+    badgeEnabled: settings.storeBadgeEnabled,
+    ratingAverage: settings.storeRatingAverage,
+    ratingCount: settings.storeRatingCount,
+    productCount,
+    responseRatePercent: settings.storeResponseRatePercent,
+    activeLabel: formatActiveAgoLabel(lastLoginAt),
+  };
+
+  return (
+    <ProductExperience
+      product={toProductDTO(product)}
+      store={store}
+      relatedProducts={relatedProducts.map(toRelatedProductDTO)}
+    />
+  );
 }

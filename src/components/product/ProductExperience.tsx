@@ -17,9 +17,19 @@ import { Specifications } from "@/components/product/Specifications";
 import { StickyBuyBar } from "@/components/product/StickyBuyBar";
 import { PurchaseSheet } from "@/components/product/PurchaseSheet";
 import { ReviewsSection } from "@/components/product/ReviewsSection";
+import { StoreInfo } from "@/components/product/StoreInfo";
 import { discountPercent } from "@/lib/money";
+import type { RelatedProductDTO, StoreInfoDTO } from "@/lib/product-dto";
 
-export function ProductExperience({ product }: { product: ProductDTO }) {
+export function ProductExperience({
+  product,
+  store,
+  relatedProducts,
+}: {
+  product: ProductDTO;
+  store: StoreInfoDTO;
+  relatedProducts: RelatedProductDTO[];
+}) {
   const firstGroup = product.variants[0]?.groupName ?? null;
   const requiresVariant = product.variants.length > 0;
 
@@ -102,9 +112,9 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
       />
 
       <OfferBanner
+        productId={product.id}
         offerEnabled={product.offerEnabled}
         discountPercent={discountPercent(effectivePriceCents, effectiveCompareAtPriceCents)}
-        offerExpiresAtISO={product.offerExpiresAtISO}
       />
 
       <div className="flex flex-col gap-4 px-3 py-4">
@@ -140,6 +150,9 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
         <Benefits benefits={product.benefits} />
         <Description text={product.description} />
         <Specifications specs={product.specifications} />
+
+        <StoreInfo store={store} relatedProducts={relatedProducts} />
+
         <ReviewsSection
           reviews={product.reviews}
           ratingAverage={product.ratingAverage}

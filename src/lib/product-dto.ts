@@ -50,6 +50,28 @@ export type ReviewDTO = {
 export type ReviewHighlightDTO = { label: string; text: string };
 export type OfferChipDTO = { label: string };
 
+export type StoreInfoDTO = {
+  logoUrl: string | null;
+  name: string;
+  badgeLabel: string | null;
+  badgeEnabled: boolean;
+  ratingAverage: number;
+  ratingCount: number;
+  productCount: number;
+  responseRatePercent: number;
+  activeLabel: string;
+};
+
+export type RelatedProductDTO = {
+  id: string;
+  slug: string;
+  name: string;
+  imageUrl: string | null;
+  priceCents: number;
+  ratingAverage: number;
+  soldCount: number;
+};
+
 export type ShippingInfoDTO = {
   enabled: boolean;
   deliveryText: string | null;
@@ -144,6 +166,28 @@ function parseOfferChips(raw: string | null): OfferChipDTO[] {
   } catch {
     return [];
   }
+}
+
+type RelatedProductSource = {
+  id: string;
+  slug: string;
+  name: string;
+  priceCents: number;
+  ratingAverage: number;
+  soldCount: number;
+  images: { url: string }[];
+};
+
+export function toRelatedProductDTO(product: RelatedProductSource): RelatedProductDTO {
+  return {
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    imageUrl: product.images[0]?.url ?? null,
+    priceCents: product.priceCents,
+    ratingAverage: product.ratingAverage,
+    soldCount: product.soldCount,
+  };
 }
 
 export function toProductDTO(product: FullProduct): ProductDTO {

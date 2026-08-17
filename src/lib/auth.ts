@@ -1,6 +1,7 @@
 import { SignJWT, jwtVerify } from "jose";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { db } from "@/lib/db";
 
 const SESSION_COOKIE = "admin_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 hours
@@ -66,3 +67,14 @@ export async function getSession(): Promise<AdminSession | null> {
 }
 
 export const SESSION_COOKIE_NAME = SESSION_COOKIE;
+
+// Used by the storefront "Ativo há X" readout (StoreInfo, Refinamento 6) — real data
+// only, never fabricated. Returns null when no admin has ever logged in.
+export async function getMostRecentAdminLoginAt(): Promise<Date | null> {
+  const admin = await db.admin.findFirst({
+    where: { lastLoginAt: { not: null } },
+    orderBy: { lastLoginAt: "desc" },
+    select: { lastLoginAt: true },
+  });
+  return admin?.lastLoginAt ?? null;
+}

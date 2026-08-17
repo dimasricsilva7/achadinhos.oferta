@@ -3,6 +3,25 @@
 import { useRef, useState } from "react";
 import type { ProductImageDTO, ProductVariantDTO } from "@/lib/product-dto";
 
+function PlayBadge({ size = "large" }: { size?: "large" | "small" }) {
+  const dims = size === "large" ? 56 : 16;
+  return (
+    <span
+      className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20"
+      aria-hidden="true"
+    >
+      <span
+        className="flex items-center justify-center rounded-full bg-black/55 text-white"
+        style={{ width: dims, height: dims }}
+      >
+        <svg width={dims * 0.45} height={dims * 0.45} viewBox="0 0 24 24" fill="white">
+          <path d="M8 5v14l11-7L8 5Z" />
+        </svg>
+      </span>
+    </span>
+  );
+}
+
 export function ProductGallery({
   images,
   activeUrl,
@@ -43,16 +62,31 @@ export function ProductGallery({
         style={{ scrollbarWidth: "none" }}
       >
         {items.map((img, i) => (
-          <div key={img.id} className="flex h-full w-full flex-shrink-0 snap-center items-center justify-center bg-neutral-100">
+          <div key={img.id} className="relative flex h-full w-full flex-shrink-0 snap-center items-center justify-center bg-neutral-100">
             {img.url ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={img.url}
-                alt={img.alt || ""}
-                className="h-full w-full object-cover"
-                loading={i === 0 ? "eager" : "lazy"}
-                fetchPriority={i === 0 ? "high" : "auto"}
-              />
+              img.type === "video" ? (
+                // Styled like a looping "GIF" preview (autoplay, muted, loop) rather than
+                // a controls-first player, matching the reference gallery's video tile.
+                <video
+                  src={img.url}
+                  className="h-full w-full object-cover"
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  controls
+                  preload={i === 0 ? "auto" : "metadata"}
+                />
+              ) : (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={img.url}
+                  alt={img.alt || ""}
+                  className="h-full w-full object-cover"
+                  loading={i === 0 ? "eager" : "lazy"}
+                  fetchPriority={i === 0 ? "high" : "auto"}
+                />
+              )
             ) : (
               <div className="flex h-full w-full items-center justify-center text-sm text-foreground/40">Sem imagem</div>
             )}
@@ -113,6 +147,28 @@ export function ProductGallery({
               );
             })}
           </div>
+        </div>
+      )}
+
+      {items.length > 1 && (
+        <div className="flex gap-1.5 overflow-x-auto border-t border-border bg-surface px-3 py-2" style={{ scrollbarWidth: "none" }}>
+          {items.map((img, i) => (
+            <button
+              key={`thumb-${img.id}`}
+              type="button"
+              aria-label={`Ir para item ${i + 1}${img.type === "video" ? " (vídeo)" : ""}`}
+              onClick={() => scrollTo(i)}
+              className={`relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-md border-2 bg-neutral-100 transition-colors duration-150 ${
+                i === index ? "border-brand" : "border-transparent"
+              }`}
+            >
+              {img.url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={img.url} alt="" className="h-full w-full object-cover" />
+              ) : null}
+              {img.type === "video" && <PlayBadge size="small" />}
+            </button>
+          ))}
         </div>
       )}
     </div>

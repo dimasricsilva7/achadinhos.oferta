@@ -2,13 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { put } from "@vercel/blob";
 
-const ALLOWED_MIME: Record<string, string> = {
+const ALLOWED_IMAGE_MIME: Record<string, string> = {
   "image/jpeg": "jpg",
   "image/png": "png",
   "image/webp": "webp",
   "image/avif": "avif",
 };
-const MAX_BYTES = 5 * 1024 * 1024; // 5MB
+const ALLOWED_VIDEO_MIME: Record<string, string> = {
+  "video/mp4": "mp4",
+  "video/webm": "webm",
+};
+const ALLOWED_MIME: Record<string, string> = { ...ALLOWED_IMAGE_MIME, ...ALLOWED_VIDEO_MIME };
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_VIDEO_BYTES = 20 * 1024 * 1024; // 20MB — video files are naturally heavier
 
 // Validates MIME type against an allowlist (not just the filename extension), caps
 // size, and writes with a random generated name outside of any user-controlled path
@@ -31,8 +38,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tipo de arquivo não permitido" }, { status: 415 });
   }
 
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: "Arquivo excede 5MB" }, { status: 413 });
+  const isVideo = file.type in ALLOWED_VIDEO_MIME;
+  const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+  if (file.size > maxBytes) {
+    return NextResponse.json({ error: `Arquivo excede ${maxBytes / (1024 * 1024)}MB` }, { status: 413 });
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());

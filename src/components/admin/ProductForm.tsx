@@ -187,24 +187,44 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
   const [error, setError] = useState<string | null>(null);
   const [errorIssues, setErrorIssues] = useState<{ field: string; message: string }[]>([]);
 
+  async function uploadFile(file: File): Promise<string | null> {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error ?? "Falha no upload");
+      return null;
+    }
+    return data.url as string;
+  }
+
   async function handleUpload(file: File) {
     setUploading(true);
     setError(null);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error ?? "Falha no upload");
-        return;
-      }
+      const url = await uploadFile(file);
+      if (!url) return;
+      const isVideo = file.type.startsWith("video/");
       setImages((prev) => [
         ...prev,
-        { url: data.url, alt: name, type: "image", sortOrder: prev.length, isPrimary: prev.length === 0 },
+        { url, alt: name, type: isVideo ? "video" : "image", sortOrder: prev.length, isPrimary: prev.length === 0 },
       ]);
     } finally {
       setUploading(false);
+    }
+  }
+
+  const [uploadingAvatarIndex, setUploadingAvatarIndex] = useState<number | null>(null);
+  async function handleAvatarUpload(reviewIndex: number, file: File) {
+    setUploadingAvatarIndex(reviewIndex);
+    setError(null);
+    try {
+      const url = await uploadFile(file);
+      if (!url) return;
+      updateAt(setReviews, reviewIndex, { avatarUrl: url });
+    } finally {
+      setUploadingAvatarIndex(null);
     }
   }
 
@@ -390,8 +410,12 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
             Oferta relâmpago ativa
           </label>
           {offerEnabled && (
-            <Field label="Oferta expira em">
+            <Field label="Prazo de referência (metadado — não controla mais o cronômetro exibido na loja)">
               <input type="datetime-local" value={offerExpiresAt} onChange={(e) => setOfferExpiresAt(e.target.value)} className="input" />
+              <p className="mt-1 text-xs text-foreground/50">
+                O cronômetro da loja agora sempre mostra 15:00 contando a partir do acesso de cada visitante (reinicia
+                por sessão do navegador). Este campo fica só como histórico/metadado — não precisa preencher.
+              </p>
             </Field>
           )}
 
@@ -465,13 +489,35 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap gap-3">
             {images.map((img, i) => (
-              <div key={i} className="relative w-24">
-                <div className="aspect-square overflow-hidden rounded-lg border border-border bg-neutral-100">
-                  {img.url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={img.url} alt="" className="h-full w-full object-cover" />
+              <div key={i} className="relative w-36">
+                <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-neutral-100">
+                  {img.url &&
+                    (img.type === "video" ? (
+                      <video src={img.url} className="h-full w-full object-cover" muted loop />
+                    ) : (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img.url} alt="" className="h-full w-full object-cover" />
+                    ))}
+                  {img.type === "video" && (
+                    <span className="absolute right-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px] font-medium text-white">
+                      Vídeo
+                    </span>
                   )}
                 </div>
+                <input
+                  placeholder="URL da imagem/vídeo"
+                  value={img.url}
+                  onChange={(e) => updateAt(setImages, i, { url: e.target.value })}
+                  className="input mt-1 text-xs"
+                />
+                <select
+                  value={img.type}
+                  onChange={(e) => updateAt(setImages, i, { type: e.target.value })}
+                  className="input mt-1 text-xs"
+                >
+                  <option value="image">Imagem</option>
+                  <option value="video">Vídeo</option>
+                </select>
                 <button
                   type="button"
                   onClick={() => setImages((prev) => prev.filter((_, idx) => idx !== i))}
@@ -491,10 +537,18 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
               </div>
             ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setImages((prev) => [...prev, { url: "", alt: name, type: "image", sortOrder: prev.length, isPrimary: prev.length === 0 }])}
+            className="w-fit rounded-lg border border-dashed border-border px-3 py-2 text-sm text-foreground/60 hover:border-brand hover:text-brand"
+          >
+            + Adicionar imagem/vídeo por URL
+          </button>
+          <p className="text-xs text-foreground/50">Ou envie um arquivo (imagem até 5MB, vídeo até 20MB):</p>
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/avif"
+            accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) handleUpload(file);
@@ -677,7 +731,27 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
                     ))}
                   </select>
                 </div>
-                <input placeholder="URL do avatar (opcional)" value={r.avatarUrl} onChange={(e) => updateAt(setReviews, i, { avatarUrl: e.target.value })} className="input" />
+                <div className="flex items-center gap-2">
+                  <input placeholder="URL do avatar (opcional)" value={r.avatarUrl} onChange={(e) => updateAt(setReviews, i, { avatarUrl: e.target.value })} className="input" />
+                  {r.avatarUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={r.avatarUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
+                  )}
+                  <label className="flex-shrink-0 cursor-pointer text-xs text-brand">
+                    {uploadingAvatarIndex === i ? "Enviando…" : "Enviar foto"}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/avif"
+                      className="hidden"
+                      disabled={uploadingAvatarIndex === i}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleAvatarUpload(i, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                </div>
                 <textarea placeholder="Comentário" value={r.comment} onChange={(e) => updateAt(setReviews, i, { comment: e.target.value })} rows={3} className="input" />
                 <input
                   type="number"
