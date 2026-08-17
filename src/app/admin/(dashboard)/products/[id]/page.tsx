@@ -12,6 +12,16 @@ function parseReviewHighlights(raw: string | null): { label: string; text: strin
   }
 }
 
+function parseOfferChips(raw: string | null): { label: string }[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 type Params = { params: Promise<{ id: string }> };
 
 export default async function EditProductPage({ params }: Params) {
@@ -39,6 +49,13 @@ export default async function EditProductPage({ params }: Params) {
           soldCount: product.soldCount,
           offerEnabled: product.offerEnabled,
           offerExpiresAt: product.offerExpiresAt ? product.offerExpiresAt.toISOString() : null,
+          offerChips: parseOfferChips(product.offerChips),
+          officialBadge: product.officialBadge,
+          shippingEnabled: product.shippingEnabled,
+          shippingDeliveryText: product.shippingDeliveryText,
+          shippingFree: product.shippingFree,
+          shippingOriginalPriceCents: product.shippingOriginalPriceCents,
+          shippingFinalPriceCents: product.shippingFinalPriceCents,
           checkoutUrl: product.checkoutUrl,
           images: product.images,
           variants: product.variants,

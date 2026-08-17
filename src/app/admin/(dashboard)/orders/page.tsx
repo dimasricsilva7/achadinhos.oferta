@@ -25,6 +25,16 @@ const STATUS_LABEL: Record<string, string> = {
   REFUNDED: "Reembolsado",
 };
 
+const STATUS_DOT: Record<string, string> = {
+  PENDING: "bg-neutral-400",
+  PAID: "bg-success",
+  PROCESSING: "bg-brand",
+  SHIPPED: "bg-brand",
+  DELIVERED: "bg-success",
+  CANCELLED: "bg-price",
+  REFUNDED: "bg-price",
+};
+
 export default function AdminOrdersPage() {
   const [items, setItems] = useState<OrderRow[] | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
@@ -88,13 +98,16 @@ export default function AdminOrdersPage() {
           <tbody>
             {items?.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-foreground/50">
-                  Nenhum pedido encontrado.
+                <td colSpan={6} className="px-4 py-10 text-center text-foreground/50">
+                  <p className="font-medium">Nenhum pedido encontrado.</p>
+                  <p className="mt-1 text-xs">
+                    {statusFilter ? "Tente outro filtro de status." : "Pedidos aparecem aqui assim que um cliente inicia o checkout."}
+                  </p>
                 </td>
               </tr>
             )}
             {items?.map((o) => (
-              <tr key={o.id} className="border-b border-border last:border-0">
+              <tr key={o.id} className="border-b border-border transition-colors duration-150 last:border-0 hover:bg-black/[0.02]">
                 <td className="px-4 py-3 font-mono text-xs text-foreground/70">{o.orderNumber}</td>
                 <td className="px-4 py-3">
                   {o.product.name}
@@ -103,21 +116,24 @@ export default function AdminOrdersPage() {
                 <td className="px-4 py-3">{o.quantity}</td>
                 <td className="px-4 py-3 font-medium">{formatCentsBRL(o.totalCents)}</td>
                 <td className="px-4 py-3">
-                  <select
-                    value={o.status}
-                    disabled={busyId === o.id}
-                    onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                    className="rounded border border-border px-2 py-1 text-xs"
-                  >
-                    <option value="PENDING" disabled>
-                      Pendente
-                    </option>
-                    {ADMIN_SETTABLE_ORDER_STATUS.map((s) => (
-                      <option key={s} value={s}>
-                        {STATUS_LABEL[s]}
+                  <div className="flex items-center gap-1.5">
+                    <span className={`h-2 w-2 flex-shrink-0 rounded-full ${STATUS_DOT[o.status] ?? "bg-neutral-400"}`} />
+                    <select
+                      value={o.status}
+                      disabled={busyId === o.id}
+                      onChange={(e) => handleStatusChange(o.id, e.target.value)}
+                      className="rounded border border-border px-2 py-1 text-xs transition-colors duration-150 focus:border-brand focus:outline-none disabled:opacity-50"
+                    >
+                      <option value="PENDING" disabled>
+                        Pendente
                       </option>
-                    ))}
-                  </select>
+                      {ADMIN_SETTABLE_ORDER_STATUS.map((s) => (
+                        <option key={s} value={s}>
+                          {STATUS_LABEL[s]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </td>
                 <td className="px-4 py-3 text-xs text-foreground/50">{new Date(o.createdAt).toLocaleString("pt-BR")}</td>
               </tr>

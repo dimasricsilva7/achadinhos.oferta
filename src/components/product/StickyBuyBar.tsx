@@ -2,6 +2,19 @@ import { formatCentsBRL } from "@/lib/money";
 
 type BuyState = "idle" | "loading" | "error";
 
+function IconButton({ label, onClick, children }: { label: string; onClick?: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-neutral-100 text-foreground/70 transition-colors duration-150 hover:bg-neutral-200 active:bg-neutral-300"
+    >
+      {children}
+    </button>
+  );
+}
+
 export function StickyBuyBar({
   totalCents,
   disabled,
@@ -24,18 +37,35 @@ export function StickyBuyBar({
           {errorMessage}
         </p>
       )}
-      <div className="flex items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] text-foreground/50">Total</p>
-          <p className="truncate text-lg font-bold text-price">{formatCentsBRL(totalCents)}</p>
-        </div>
+      <div className="flex items-center gap-2">
+        <IconButton label="Conversar com o vendedor">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5Z" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </IconButton>
+        <IconButton label="Ver compra" onClick={onBuy}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M6 6h15l-1.5 9h-12L5 3H2" strokeLinecap="round" strokeLinejoin="round" />
+            <circle cx="9" cy="20" r="1.4" fill="currentColor" stroke="none" />
+            <circle cx="18" cy="20" r="1.4" fill="currentColor" stroke="none" />
+          </svg>
+        </IconButton>
         <button
           type="button"
           onClick={onBuy}
           disabled={disabled || state === "loading"}
-          className="flex h-12 min-w-[180px] items-center justify-center rounded-lg bg-brand px-6 text-sm font-semibold text-white transition-colors active:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
+          className="flex h-12 flex-1 flex-col items-center justify-center rounded-lg bg-brand leading-tight text-white transition-colors duration-150 active:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
         >
-          {state === "loading" ? "Processando…" : disabled ? disabledReason ?? "Indisponível" : "Comprar agora"}
+          {state === "loading" ? (
+            <span className="text-sm font-semibold">Processando…</span>
+          ) : disabled ? (
+            <span className="text-sm font-semibold">{disabledReason ?? "Indisponível"}</span>
+          ) : (
+            <>
+              <span className="text-xs font-medium">Compre com cupons</span>
+              <span className="text-base font-bold">{formatCentsBRL(totalCents)}</span>
+            </>
+          )}
         </button>
       </div>
     </div>

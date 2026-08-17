@@ -1,9 +1,21 @@
 "use client";
 
 import { useRef, useState } from "react";
-import type { ProductImageDTO } from "@/lib/product-dto";
+import type { ProductImageDTO, ProductVariantDTO } from "@/lib/product-dto";
 
-export function ProductGallery({ images, activeUrl }: { images: ProductImageDTO[]; activeUrl: string | null }) {
+export function ProductGallery({
+  images,
+  activeUrl,
+  variants = [],
+  selectedVariantId = null,
+  onSelectVariant,
+}: {
+  images: ProductImageDTO[];
+  activeUrl: string | null;
+  variants?: ProductVariantDTO[];
+  selectedVariantId?: string | null;
+  onSelectVariant?: (id: string) => void;
+}) {
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
 
@@ -70,6 +82,37 @@ export function ProductGallery({ images, activeUrl }: { images: ProductImageDTO[
       {items.length > 1 && (
         <div className="absolute bottom-3 right-3 rounded-full bg-black/60 px-2 py-0.5 text-xs text-white">
           {index + 1}/{items.length}
+        </div>
+      )}
+
+      {variants.length > 0 && (
+        <div className="flex items-center gap-2 border-t border-border bg-surface px-3 py-2">
+          <span className="flex-shrink-0 text-xs text-foreground/50">
+            {variants.length} {variants.length === 1 ? "Variação Disponível" : "Variações Disponíveis"}
+          </span>
+          <div className="flex flex-1 gap-1.5 overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+            {variants.map((v) => {
+              const selected = v.id === selectedVariantId;
+              const thumb = v.imageUrl ?? items[0]?.url ?? "";
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  aria-label={v.label}
+                  aria-pressed={selected}
+                  onClick={() => onSelectVariant?.(v.id)}
+                  className={`h-9 w-9 flex-shrink-0 overflow-hidden rounded-md border-2 bg-neutral-100 transition-colors duration-150 ${
+                    selected ? "border-brand" : "border-transparent"
+                  }`}
+                >
+                  {thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" className="h-full w-full object-cover" />
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

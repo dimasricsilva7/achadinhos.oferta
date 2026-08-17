@@ -71,6 +71,10 @@ export const reviewHighlightInput = z.object({
   text: z.string().min(1).max(300),
 });
 
+export const offerChipInput = z.object({
+  label: z.string().min(1).max(60),
+});
+
 export const productUpsertSchema = z.object({
   slug: z
     .string()
@@ -89,6 +93,13 @@ export const productUpsertSchema = z.object({
   soldCount: z.number().int().min(0).default(0),
   offerEnabled: z.boolean().default(false),
   offerExpiresAt: z.string().datetime().optional().nullable(),
+  offerChips: z.array(offerChipInput).max(10).default([]),
+  officialBadge: z.boolean().default(false),
+  shippingEnabled: z.boolean().default(true),
+  shippingDeliveryText: z.string().max(120).optional().nullable(),
+  shippingFree: z.boolean().default(true),
+  shippingOriginalPriceCents: z.number().int().positive().optional().nullable(),
+  shippingFinalPriceCents: z.number().int().min(0).optional().nullable(),
   checkoutUrl: z.string().url().optional().nullable(),
   images: z.array(productImageInput).default([]),
   variants: z.array(productVariantInput).default([]),

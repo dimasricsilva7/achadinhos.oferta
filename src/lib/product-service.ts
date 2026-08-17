@@ -186,6 +186,13 @@ function baseProductData(input: ProductUpsertInput) {
     soldCount: input.soldCount,
     offerEnabled: input.offerEnabled,
     offerExpiresAt: input.offerExpiresAt ? new Date(input.offerExpiresAt) : null,
+    offerChips: JSON.stringify(input.offerChips),
+    officialBadge: input.officialBadge,
+    shippingEnabled: input.shippingEnabled,
+    shippingDeliveryText: input.shippingDeliveryText ?? null,
+    shippingFree: input.shippingFree,
+    shippingOriginalPriceCents: input.shippingOriginalPriceCents ?? null,
+    shippingFinalPriceCents: input.shippingFinalPriceCents ?? null,
     checkoutUrl: input.checkoutUrl ?? null,
     reviewHighlights: JSON.stringify(input.reviewHighlights),
   };
@@ -268,6 +275,13 @@ export async function duplicateProduct(id: string) {
       ratingCount: 0,
       offerEnabled: source.offerEnabled,
       offerExpiresAt: source.offerExpiresAt,
+      offerChips: source.offerChips,
+      officialBadge: source.officialBadge,
+      shippingEnabled: source.shippingEnabled,
+      shippingDeliveryText: source.shippingDeliveryText,
+      shippingFree: source.shippingFree,
+      shippingOriginalPriceCents: source.shippingOriginalPriceCents,
+      shippingFinalPriceCents: source.shippingFinalPriceCents,
       checkoutUrl: null,
       // Highlights are admin-authored copy about the product, not customer data —
       // safe (and expected) to carry over, unlike reviews themselves.

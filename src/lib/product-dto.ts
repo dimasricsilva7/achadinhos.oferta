@@ -48,6 +48,15 @@ export type ReviewDTO = {
 };
 
 export type ReviewHighlightDTO = { label: string; text: string };
+export type OfferChipDTO = { label: string };
+
+export type ShippingInfoDTO = {
+  enabled: boolean;
+  deliveryText: string | null;
+  free: boolean;
+  originalPriceCents: number | null;
+  finalPriceCents: number | null;
+};
 
 export type ProductDTO = {
   id: string;
@@ -63,6 +72,9 @@ export type ProductDTO = {
   ratingCount: number;
   offerEnabled: boolean;
   offerExpiresAtISO: string | null;
+  offerChips: OfferChipDTO[];
+  officialBadge: boolean;
+  shipping: ShippingInfoDTO;
   hasCheckout: boolean;
   images: ProductImageDTO[];
   variants: ProductVariantDTO[];
@@ -87,6 +99,13 @@ type FullProduct = {
   ratingCount: number;
   offerEnabled: boolean;
   offerExpiresAt: Date | null;
+  offerChips: string | null;
+  officialBadge: boolean;
+  shippingEnabled: boolean;
+  shippingDeliveryText: string | null;
+  shippingFree: boolean;
+  shippingOriginalPriceCents: number | null;
+  shippingFinalPriceCents: number | null;
   checkoutUrl: string | null;
   reviewHighlights: string | null;
   images: { id: string; url: string; alt: string; type: string; sortOrder: number; isPrimary: boolean }[];
@@ -117,6 +136,16 @@ function parseReviewHighlights(raw: string | null): ReviewHighlightDTO[] {
   }
 }
 
+function parseOfferChips(raw: string | null): OfferChipDTO[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 export function toProductDTO(product: FullProduct): ProductDTO {
   return {
     id: product.id,
@@ -132,6 +161,15 @@ export function toProductDTO(product: FullProduct): ProductDTO {
     ratingCount: product.ratingCount,
     offerEnabled: product.offerEnabled,
     offerExpiresAtISO: product.offerExpiresAt ? product.offerExpiresAt.toISOString() : null,
+    offerChips: parseOfferChips(product.offerChips),
+    officialBadge: product.officialBadge,
+    shipping: {
+      enabled: product.shippingEnabled,
+      deliveryText: product.shippingDeliveryText,
+      free: product.shippingFree,
+      originalPriceCents: product.shippingOriginalPriceCents,
+      finalPriceCents: product.shippingFinalPriceCents,
+    },
     hasCheckout: Boolean(product.checkoutUrl) || product.variants.some((v) => v.checkoutUrl),
     images: product.images,
     variants: product.variants.map((v) => ({

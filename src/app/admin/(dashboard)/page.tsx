@@ -56,7 +56,7 @@ export default function AdminDashboardPage() {
         <select
           value={range}
           onChange={(e) => setRange(e.target.value)}
-          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm"
+          className="rounded-lg border border-border bg-surface px-3 py-2 text-sm transition-colors duration-150 focus:border-brand focus:outline-none"
         >
           {RANGES.map((r) => (
             <option key={r.value} value={r.value}>
@@ -66,18 +66,26 @@ export default function AdminDashboardPage() {
         </select>
       </div>
 
-      {error && <p className="mb-4 text-sm text-price">{error}</p>}
+      {error && <p className="mb-4 rounded-lg bg-price/10 px-3 py-2 text-sm text-price">{error}</p>}
 
       {!data ? (
-        <p className="text-sm text-foreground/50">Carregando…</p>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-[86px] animate-pulse rounded-xl border border-border bg-surface" />
+          ))}
+        </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <Card label="Pedidos" value={String(data.totalOrders)} />
-          <Card label="Pendentes" value={String(data.statusCounts.PENDING ?? 0)} />
-          <Card label="Pagos" value={String(data.statusCounts.PAID ?? 0)} />
-          <Card label="Cancelados" value={String((data.statusCounts.CANCELLED ?? 0) + (data.statusCounts.REFUNDED ?? 0))} />
-          <Card label="Faturamento acumulado" value={formatCentsBRL(data.grossRevenueCents)} />
+          <Card label="Faturamento acumulado" value={formatCentsBRL(data.grossRevenueCents)} highlight className="col-span-2" />
           <Card label="Ticket médio" value={formatCentsBRL(data.averageTicketCents)} />
+          <Card label="Pedidos" value={String(data.totalOrders)} />
+          <Card label="Pendentes" value={String(data.statusCounts.PENDING ?? 0)} tone="neutral" />
+          <Card label="Pagos" value={String(data.statusCounts.PAID ?? 0)} tone="success" />
+          <Card
+            label="Cancelados"
+            value={String((data.statusCounts.CANCELLED ?? 0) + (data.statusCounts.REFUNDED ?? 0))}
+            tone="danger"
+          />
         </div>
       )}
 
@@ -89,11 +97,30 @@ export default function AdminDashboardPage() {
   );
 }
 
-function Card({ label, value }: { label: string; value: string }) {
+function Card({
+  label,
+  value,
+  highlight = false,
+  tone,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  highlight?: boolean;
+  tone?: "neutral" | "success" | "danger";
+  className?: string;
+}) {
+  const toneClass =
+    tone === "success" ? "text-success" : tone === "danger" ? "text-price" : tone === "neutral" ? "text-foreground/70" : "text-foreground";
+
   return (
-    <div className="rounded-xl border border-border bg-surface p-4">
+    <div
+      className={`rounded-xl border p-4 transition-shadow duration-150 hover:shadow-sm ${
+        highlight ? "border-brand/30 bg-brand/5" : "border-border bg-surface"
+      } ${className}`}
+    >
       <p className="text-xs text-foreground/50">{label}</p>
-      <p className="mt-1 text-xl font-bold text-foreground">{value}</p>
+      <p className={`mt-1 font-bold ${highlight ? "text-2xl text-brand" : `text-xl ${toneClass}`}`}>{value}</p>
     </div>
   );
 }

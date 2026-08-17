@@ -30,7 +30,7 @@ export function AdminNav() {
             <li key={link.href}>
               <Link
                 href={link.href}
-                className={`block rounded-lg px-3 py-2 text-sm ${
+                className={`block rounded-lg px-3 py-2 text-sm transition-colors duration-150 ${
                   active ? "bg-brand/10 font-medium text-brand" : "text-foreground/70 hover:bg-black/5"
                 }`}
               >
@@ -43,7 +43,7 @@ export function AdminNav() {
       <button
         type="button"
         onClick={handleLogout}
-        className="mt-4 rounded-lg px-3 py-2 text-left text-sm text-foreground/60 hover:bg-black/5"
+        className="mt-4 rounded-lg px-3 py-2 text-left text-sm text-foreground/60 transition-colors duration-150 hover:bg-black/5"
       >
         Sair
       </button>

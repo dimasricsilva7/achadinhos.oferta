@@ -41,6 +41,7 @@ type ReviewRow = {
   media: ReviewMediaRow[];
 };
 type ReviewHighlightRow = { label: string; text: string };
+type OfferChipRow = { label: string };
 
 export type ProductFormInitial = {
   id?: string;
@@ -58,6 +59,13 @@ export type ProductFormInitial = {
   soldCount: number;
   offerEnabled: boolean;
   offerExpiresAt: string | null; // ISO
+  offerChips: OfferChipRow[];
+  officialBadge: boolean;
+  shippingEnabled: boolean;
+  shippingDeliveryText: string | null;
+  shippingFree: boolean;
+  shippingOriginalPriceCents: number | null;
+  shippingFinalPriceCents: number | null;
   checkoutUrl: string | null;
   images: ImageRow[];
   variants: { id: string; groupName: string; label: string; sku: string | null; imageUrl: string | null; priceCents: number | null; stock: number; checkoutUrl: string | null; sortOrder: number }[];
@@ -81,6 +89,7 @@ export type ProductFormInitial = {
 const TABS = [
   "Geral",
   "Preços & Oferta",
+  "Entrega",
   "Imagens",
   "Variações",
   "Especificações",
@@ -116,6 +125,13 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
   const [soldCount, setSoldCount] = useState(initial?.soldCount ?? 0);
   const [offerEnabled, setOfferEnabled] = useState(initial?.offerEnabled ?? false);
   const [offerExpiresAt, setOfferExpiresAt] = useState(toLocalDatetimeInput(initial?.offerExpiresAt ?? null));
+  const [offerChips, setOfferChips] = useState<OfferChipRow[]>(initial?.offerChips ?? []);
+  const [officialBadge, setOfficialBadge] = useState(initial?.officialBadge ?? false);
+  const [shippingEnabled, setShippingEnabled] = useState(initial?.shippingEnabled ?? true);
+  const [shippingDeliveryText, setShippingDeliveryText] = useState(initial?.shippingDeliveryText ?? "");
+  const [shippingFree, setShippingFree] = useState(initial?.shippingFree ?? true);
+  const [shippingOriginalPrice, setShippingOriginalPrice] = useState(centsToReaisInput(initial?.shippingOriginalPriceCents ?? null));
+  const [shippingFinalPrice, setShippingFinalPrice] = useState(centsToReaisInput(initial?.shippingFinalPriceCents ?? null));
   const [checkoutUrl, setCheckoutUrl] = useState(initial?.checkoutUrl ?? "");
 
   const [images, setImages] = useState<ImageRow[]>(initial?.images ?? []);
@@ -169,6 +185,7 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorIssues, setErrorIssues] = useState<{ field: string; message: string }[]>([]);
 
   async function handleUpload(file: File) {
     setUploading(true);
@@ -195,6 +212,7 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    setErrorIssues([]);
 
     const priceCents = reaisInputToCents(price);
     if (!priceCents) {
@@ -219,6 +237,13 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
       soldCount: Number(soldCount),
       offerEnabled,
       offerExpiresAt: offerExpiresAt ? new Date(offerExpiresAt).toISOString() : null,
+      offerChips: offerChips.filter((c) => c.label.trim() !== ""),
+      officialBadge,
+      shippingEnabled,
+      shippingDeliveryText: shippingDeliveryText || null,
+      shippingFree,
+      shippingOriginalPriceCents: reaisInputToCents(shippingOriginalPrice),
+      shippingFinalPriceCents: reaisInputToCents(shippingFinalPrice),
       checkoutUrl: checkoutUrl || null,
       images,
       variants: variants.map((v) => ({
@@ -256,10 +281,15 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
     setSaving(false);
 
     if (!res.ok) {
-      const issues = Array.isArray(data.issues)
-        ? data.issues.map((i: { path: (string | number)[]; message: string }) => `${i.path.join(".") || "campo"}: ${i.message}`).join(" · ")
-        : null;
-      setError(issues ? `${data.error} — ${issues}` : data.error ?? "Não foi possível salvar o produto.");
+      setError(data.error ?? "Não foi possível salvar o produto.");
+      if (Array.isArray(data.issues)) {
+        setErrorIssues(
+          data.issues.map((i: { path: (string | number)[]; message: string }) => ({
+            field: i.path.join(".") || "campo",
+            message: i.message,
+          }))
+        );
+      }
       return;
     }
     router.push("/admin/products");
@@ -274,8 +304,10 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`rounded-t-lg px-3 py-2 text-sm ${
-              tab === t ? "border-b-2 border-brand font-medium text-brand" : "text-foreground/60 hover:text-foreground"
+            className={`rounded-t-lg border-b-2 px-3 py-2 text-sm transition-colors duration-150 ${
+              tab === t
+                ? "border-brand bg-brand/5 font-semibold text-brand"
+                : "border-transparent text-foreground/60 hover:border-border hover:text-foreground"
             }`}
           >
             {t}
@@ -283,7 +315,20 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
         ))}
       </div>
 
-      {error && <p className="mb-4 rounded-lg bg-price/10 px-3 py-2 text-sm text-price">{error}</p>}
+      {(error || errorIssues.length > 0) && (
+        <div className="mb-4 rounded-lg border border-price/20 bg-price/10 px-3 py-2.5 text-sm text-price">
+          {error && <p className="font-medium">{error}</p>}
+          {errorIssues.length > 0 && (
+            <ul className="mt-1.5 list-disc space-y-0.5 pl-4">
+              {errorIssues.map((issue, i) => (
+                <li key={i}>
+                  <span className="font-mono text-xs">{issue.field}</span>: {issue.message}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {tab === "Geral" && (
         <div className="flex flex-col gap-4">
@@ -311,6 +356,10 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
           <Field label="SKU">
             <input value={sku} onChange={(e) => setSku(e.target.value)} className="input" />
           </Field>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={officialBadge} onChange={(e) => setOfficialBadge(e.target.checked)} />
+            Selo &quot;Oficial&quot; antes do nome do produto na loja
+          </label>
         </div>
       )}
 
@@ -344,6 +393,70 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
             <Field label="Oferta expira em">
               <input type="datetime-local" value={offerExpiresAt} onChange={(e) => setOfferExpiresAt(e.target.value)} className="input" />
             </Field>
+          )}
+
+          <div className="flex flex-col gap-2 border-t border-border pt-4">
+            <p className="text-sm font-medium text-foreground/80">
+              Chips de oferta (pílulas decorativas exibidas abaixo do preço na loja)
+            </p>
+            {offerChips.map((chip, i) => (
+              <div key={i} className="flex gap-2">
+                <input
+                  placeholder='Ex.: "Compre R$100 e ganhe R$1 off"'
+                  value={chip.label}
+                  onChange={(e) => updateAt(setOfferChips, i, { label: e.target.value })}
+                  className="input"
+                />
+                <button type="button" onClick={() => setOfferChips((prev) => prev.filter((_, idx) => idx !== i))} className="text-xs text-price">
+                  Remover
+                </button>
+              </div>
+            ))}
+            {offerChips.length < 10 && (
+              <button
+                type="button"
+                onClick={() => setOfferChips((prev) => [...prev, { label: "" }])}
+                className="w-fit rounded-lg border border-dashed border-border px-3 py-2 text-sm text-foreground/60 transition-colors duration-150 hover:border-brand hover:text-brand"
+              >
+                + Adicionar chip
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "Entrega" && (
+        <div className="flex flex-col gap-4">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={shippingEnabled} onChange={(e) => setShippingEnabled(e.target.checked)} />
+            Mostrar bloco de entrega na página do produto
+          </label>
+          <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+            Texto livre e informativo — não há cálculo real de frete. Não afeta o preço nem o checkout.
+          </p>
+          {shippingEnabled && (
+            <>
+              <Field label='Texto de entrega (ex.: "Chega entre 13 e 15/ago")'>
+                <input
+                  value={shippingDeliveryText}
+                  onChange={(e) => setShippingDeliveryText(e.target.value)}
+                  placeholder="Chega entre 13 e 15/ago"
+                  className="input"
+                />
+              </Field>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={shippingFree} onChange={(e) => setShippingFree(e.target.checked)} />
+                Frete grátis
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="Preço original do frete (R$) — riscado">
+                  <input value={shippingOriginalPrice} onChange={(e) => setShippingOriginalPrice(e.target.value)} inputMode="decimal" className="input" />
+                </Field>
+                <Field label="Preço final do frete (R$) — 0 = grátis com cupom">
+                  <input value={shippingFinalPrice} onChange={(e) => setShippingFinalPrice(e.target.value)} inputMode="decimal" className="input" />
+                </Field>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -670,7 +783,17 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
       )}
 
       <div className="mt-6 flex gap-3 border-t border-border pt-4">
-        <button type="submit" disabled={saving} className="rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60">
+        <button
+          type="submit"
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white transition-colors duration-150 hover:bg-brand-dark disabled:cursor-not-allowed disabled:bg-neutral-300 disabled:text-neutral-500"
+        >
+          {saving && (
+            <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="3" opacity="0.25" />
+              <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          )}
           {saving ? "Salvando…" : "Salvar produto"}
         </button>
       </div>

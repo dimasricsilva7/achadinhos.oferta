@@ -7,6 +7,8 @@ import { ProductGallery } from "@/components/product/ProductGallery";
 import { OfferBanner } from "@/components/product/OfferBanner";
 import { PriceBlock } from "@/components/product/PriceBlock";
 import { SoldBadge } from "@/components/product/RatingSold";
+import { OfferChips } from "@/components/product/OfferChips";
+import { ShippingInfo } from "@/components/product/ShippingInfo";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { Benefits } from "@/components/product/Benefits";
@@ -89,9 +91,15 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
 
   return (
     <div className="mx-auto flex min-h-full max-w-lg flex-col bg-background">
-      <ProductHeader title={product.name} />
+      <ProductHeader title={product.name} onCartClick={() => setIsSheetOpen(true)} />
 
-      <ProductGallery images={product.images} activeUrl={effectiveImageUrl} />
+      <ProductGallery
+        images={product.images}
+        activeUrl={effectiveImageUrl}
+        variants={product.variants}
+        selectedVariantId={selectedVariantId}
+        onSelectVariant={setSelectedVariantId}
+      />
 
       <OfferBanner
         offerEnabled={product.offerEnabled}
@@ -105,12 +113,21 @@ export function ProductExperience({ product }: { product: ProductDTO }) {
           <SoldBadge soldCount={product.soldCount} />
         </div>
 
+        <OfferChips chips={product.offerChips} />
+
         <div>
+          {product.officialBadge && (
+            <span className="mb-1 inline-block rounded bg-brand px-1.5 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white">
+              Oficial
+            </span>
+          )}
           <h1 className="text-base font-semibold leading-snug text-foreground">{product.name}</h1>
           {product.shortDescription && (
             <p className="mt-1 text-sm text-foreground/60">{product.shortDescription}</p>
           )}
         </div>
+
+        <ShippingInfo shipping={product.shipping} />
 
         <p className="text-xs text-foreground/50">
           {outOfStock ? <span className="font-medium text-price">Esgotado</span> : `Estoque: ${effectiveStock}`}

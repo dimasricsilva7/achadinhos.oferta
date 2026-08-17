@@ -50,6 +50,24 @@ model Product {
   offerEnabled  Boolean   @default(false)
   offerExpiresAt DateTime?
 
+  // Decorative offer chips shown as a row of outline pills below the price
+  // (e.g. "Compre R$100 e ganhe R$1 off"). Purely informational copy — no coupon
+  // engine, no discount rule evaluated from this. JSON-encoded array of { label }.
+  offerChips String?
+
+  // Shows a small "Oficial" badge before the product name. Generic label, not tied
+  // to any external brand/marketplace program.
+  officialBadge Boolean @default(false)
+
+  // Shipping/delivery display block — free-text, admin-authored. No real freight
+  // calculation happens here (see README roadmap); it's presentational copy only,
+  // never used to compute price or affect checkout.
+  shippingEnabled             Boolean @default(true)
+  shippingDeliveryText        String? // e.g. "Chega entre 13 e 15/ago"
+  shippingFree                Boolean @default(true)
+  shippingOriginalPriceCents  Int?
+  shippingFinalPriceCents     Int? // 0 = grátis com cupom
+
   // Checkout integration: the real, verified contract with the external checkout
   // (pagseguropix.org / bravopay.club) is a pre-built static page per slug — there is
   // no discovered mechanism to pass product/price/qty via query params. So each

@@ -55,6 +55,16 @@ async function main() {
       ratingCount: 342,
       offerEnabled: true,
       offerExpiresAt,
+      offerChips: JSON.stringify([
+        { label: "Compre R$100 e ganhe R$1 off" },
+        { label: "Oferta no Combo" },
+      ]),
+      officialBadge: true,
+      shippingEnabled: true,
+      shippingDeliveryText: "Chega entre 19 e 21/ago",
+      shippingFree: true,
+      shippingOriginalPriceCents: 1990,
+      shippingFinalPriceCents: 0,
       checkoutUrl: "https://pagseguropix.org/c/produto-teste-checkout",
       reviewHighlights: JSON.stringify([
         { label: "Imagem", text: "Na parede cinza ainda ficou bem nítida." },
