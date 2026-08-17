@@ -100,7 +100,11 @@ export function ProductExperience({
   }
 
   return (
-    <div className="mx-auto flex min-h-full max-w-lg flex-col bg-background">
+    // pb-24 reserves room for the StickyBuyBar, which is `fixed` — not part of
+    // document flow — so content would otherwise end up hidden behind it. (Extra
+    // buffer beyond the bar's own ~56px height covers typical iOS safe-area insets;
+    // the bar itself separately pads for the exact safe-area value via `.safe-bottom`.)
+    <div className="mx-auto flex min-h-full max-w-lg flex-col bg-background pb-24">
       <ProductHeader title={product.name} onCartClick={() => setIsSheetOpen(true)} />
 
       <ProductGallery
@@ -160,8 +164,6 @@ export function ProductExperience({
           reviewHighlights={product.reviewHighlights}
         />
       </div>
-
-      <div className="h-2" />
 
       <StickyBuyBar
         totalCents={effectivePriceCents * quantity + addonsCents}
