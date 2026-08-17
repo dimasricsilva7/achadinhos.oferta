@@ -167,6 +167,9 @@ export const settingsUpdateSchema = z.object({
   storeResponseRatePercent: z.number().int().min(0).max(100).default(100),
   storeBadgeLabel: z.string().max(40).optional().nullable(),
   storeBadgeEnabled: z.boolean().default(false),
+  // Admin-picked product ids for the "Produtos da mesma loja" carousel, in order.
+  // Empty array means "auto-pick other active products" (see product-service.ts).
+  storeRelatedProductIds: z.array(z.string()).max(20).default([]),
 });
 
 export type SettingsUpdateInput = z.infer<typeof settingsUpdateSchema>;

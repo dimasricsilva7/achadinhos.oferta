@@ -5,9 +5,10 @@ export type FooterLink = { label: string; url: string };
 
 export type SiteSettings = Omit<
   Awaited<ReturnType<typeof db.settings.upsert>>,
-  "footerLinks"
+  "footerLinks" | "storeRelatedProductIds"
 > & {
   footerLinks: FooterLink[];
+  storeRelatedProductIds: string[];
 };
 
 function parseFooterLinks(raw: string | null): FooterLink[] {
@@ -20,6 +21,24 @@ function parseFooterLinks(raw: string | null): FooterLink[] {
   }
 }
 
+function parseStringArray(raw: string | null): string[] {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function toSiteSettings(row: Awaited<ReturnType<typeof db.settings.upsert>>): SiteSettings {
+  return {
+    ...row,
+    footerLinks: parseFooterLinks(row.footerLinks),
+    storeRelatedProductIds: parseStringArray(row.storeRelatedProductIds),
+  };
+}
+
 // Always returns a row — upserts the singleton on first read so every caller (admin
 // form, root layout) can rely on settings existing without null-checking.
 export async function getSettings(): Promise<SiteSettings> {
@@ -28,7 +47,7 @@ export async function getSettings(): Promise<SiteSettings> {
     create: { id: "singleton" },
     update: {},
   });
-  return { ...row, footerLinks: parseFooterLinks(row.footerLinks) };
+  return toSiteSettings(row);
 }
 
 export class SettingsServiceError extends Error {
@@ -52,11 +71,13 @@ export async function updateSettings(input: unknown): Promise<SiteSettings> {
       id: "singleton",
       ...data,
       footerLinks: JSON.stringify(data.footerLinks),
+      storeRelatedProductIds: JSON.stringify(data.storeRelatedProductIds),
     },
     update: {
       ...data,
       footerLinks: JSON.stringify(data.footerLinks),
+      storeRelatedProductIds: JSON.stringify(data.storeRelatedProductIds),
     },
   });
-  return { ...row, footerLinks: parseFooterLinks(row.footerLinks) };
+  return toSiteSettings(row);
 }

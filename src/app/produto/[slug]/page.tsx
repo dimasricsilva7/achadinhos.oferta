@@ -35,9 +35,9 @@ export default async function ProductPage({ params }: Params) {
 
   if (!product) notFound();
 
-  const [settings, relatedProducts, lastLoginAt] = await Promise.all([
-    getSettings(),
-    getRelatedStoreProducts(product.id),
+  const settings = await getSettings();
+  const [relatedProducts, lastLoginAt] = await Promise.all([
+    getRelatedStoreProducts(product.id, settings.storeRelatedProductIds),
     getMostRecentAdminLoginAt(),
   ]);
 

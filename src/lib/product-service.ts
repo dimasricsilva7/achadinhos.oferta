@@ -356,8 +356,22 @@ export function getProductForAdmin(id: string) {
 
 // "Produtos da mesma loja" — this is a single-store project (no multi-vendor
 // model), so "same store" just means any other published product. Used by the
-// StoreInfo block on the product page.
-export function getRelatedStoreProducts(excludeProductId: string, limit = 8) {
+// StoreInfo block on the product page. When the admin has picked specific products
+// (Settings.storeRelatedProductIds), those are shown, in the chosen order — only
+// ones that are still ACTIVE and not the current product. Otherwise falls back to
+// auto-picking other active products by soldCount.
+export async function getRelatedStoreProducts(excludeProductId: string, pickedIds: string[] = [], limit = 8) {
+  const ids = pickedIds.filter((id) => id !== excludeProductId);
+
+  if (ids.length > 0) {
+    const picked = await db.product.findMany({
+      where: { id: { in: ids }, status: "ACTIVE", deletedAt: null },
+      include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
+    });
+    const byId = new Map(picked.map((p) => [p.id, p]));
+    return ids.map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => Boolean(p)).slice(0, limit);
+  }
+
   return db.product.findMany({
     where: { status: "ACTIVE", deletedAt: null, id: { not: excludeProductId } },
     orderBy: { soldCount: "desc" },

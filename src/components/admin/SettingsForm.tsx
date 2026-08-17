@@ -41,11 +41,20 @@ export type SettingsFormInitial = {
   storeResponseRatePercent: number;
   storeBadgeLabel: string | null;
   storeBadgeEnabled: boolean;
+  storeRelatedProductIds: string[];
 };
+
+export type AvailableProduct = { id: string; name: string; status: string };
 
 type SaveState = "idle" | "saving" | "success" | "error";
 
-export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
+export function SettingsForm({
+  initial,
+  availableProducts,
+}: {
+  initial: SettingsFormInitial;
+  availableProducts: AvailableProduct[];
+}) {
   const [uploadingField, setUploadingField] = useState<"logoUrl" | "faviconUrl" | "socialImageUrl" | "storeLogoUrl" | null>(null);
   const [tab, setTab] = useState<(typeof TABS)[number]>("Identidade");
 
@@ -86,6 +95,11 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
   const [storeResponseRatePercent, setStoreResponseRatePercent] = useState(initial.storeResponseRatePercent);
   const [storeBadgeLabel, setStoreBadgeLabel] = useState(initial.storeBadgeLabel ?? "");
   const [storeBadgeEnabled, setStoreBadgeEnabled] = useState(initial.storeBadgeEnabled);
+  const [storeRelatedProductIds, setStoreRelatedProductIds] = useState<string[]>(initial.storeRelatedProductIds);
+
+  function toggleRelatedProduct(id: string) {
+    setStoreRelatedProductIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
+  }
 
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -148,6 +162,7 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
       storeResponseRatePercent: Number(storeResponseRatePercent),
       storeBadgeLabel: storeBadgeLabel || null,
       storeBadgeEnabled,
+      storeRelatedProductIds,
     };
 
     const res = await fetch("/api/admin/settings", {
@@ -376,6 +391,40 @@ export function SettingsForm({ initial }: { initial: SettingsFormInitial }) {
           <p className="text-xs text-foreground/50">
             &quot;Ativo há X&quot; é calculado a partir do último login real de um admin — não é configurável aqui.
           </p>
+
+          <div className="mt-2 border-t border-border pt-4">
+            <p className="mb-1 text-sm font-medium text-foreground">Produtos da mesma loja</p>
+            <p className="mb-3 text-xs text-foreground/50">
+              Escolha quais produtos aparecem no carrossel &quot;Produtos da mesma loja&quot;, na ordem marcada. Se
+              nenhum for escolhido, o site mostra automaticamente outros produtos ativos por mais vendidos.
+            </p>
+            {availableProducts.length === 0 ? (
+              <p className="text-xs text-foreground/50">Nenhum produto cadastrado ainda.</p>
+            ) : (
+              <div className="flex max-h-72 flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">
+                {availableProducts.map((p) => {
+                  const order = storeRelatedProductIds.indexOf(p.id);
+                  return (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-background"
+                    >
+                      <input type="checkbox" checked={order !== -1} onChange={() => toggleRelatedProduct(p.id)} />
+                      <span className="flex-1">{p.name}</span>
+                      {p.status !== "ACTIVE" && (
+                        <span className="text-xs text-warning">{p.status === "DRAFT" ? "Rascunho" : "Arquivado"}</span>
+                      )}
+                      {order !== -1 && (
+                        <span className="rounded-full bg-brand/10 px-1.5 py-0.5 text-xs font-medium text-brand">
+                          #{order + 1}
+                        </span>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

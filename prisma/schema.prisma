@@ -289,6 +289,10 @@ model Settings {
   // Free-text badge label (e.g. "Indicado") — configurable, never hardcoded copy.
   storeBadgeLabel           String?
   storeBadgeEnabled         Boolean  @default(false)
+  // JSON-encoded array of Product ids, admin-picked, in display order, for the
+  // "Produtos da mesma loja" carousel. Empty/null falls back to auto-picking other
+  // active products by soldCount.
+  storeRelatedProductIds    String?
 
   updatedAt DateTime @updatedAt
 }
