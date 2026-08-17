@@ -160,6 +160,10 @@ export const settingsUpdateSchema = z.object({
   checkoutSubtitle: z.string().max(200).optional().nullable(),
   checkoutCta: z.string().max(60).optional().nullable(),
 
+  // Public Meta Pixel ID (numeric string, e.g. "123456789012345") — not a secret,
+  // shipped straight into browser HTML by src/app/layout.tsx when set.
+  metaPixelId: z.string().max(40).regex(/^\d*$/, "Pixel ID deve conter apenas números").optional().nullable(),
+
   storeLogoUrl: optionalUrl,
   storeRatingAverage: z.number().min(0).max(5).default(0),
   storeRatingCount: z.number().int().min(0).default(0),

@@ -233,6 +233,12 @@ model Order {
 
   checkoutUrl String // exact URL the customer was redirected to, for audit
 
+  // Set once the Meta Conversions API "Purchase" event for this order is sent
+  // successfully from /api/meta/purchase — lets that route be idempotent (a page
+  // reload on /obrigado never double-fires the server-side event) without needing a
+  // separate events table. Null = never sent.
+  metaPurchaseEventSentAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -275,6 +281,12 @@ model Settings {
   checkoutTitle    String?
   checkoutSubtitle String?
   checkoutCta      String?
+
+  // Meta Pixel ID — public identifier (already shipped in browser HTML on every
+  // page once configured), not a secret. Safe to show as-is in the admin. The
+  // matching Conversions API access token is a real secret and is read only from
+  // process.env.META_CAPI_ACCESS_TOKEN (Vercel env var), never stored here.
+  metaPixelId String?
 
   // "Store info" block — this is a single-store project (no multi-vendor model), so
   // these describe the store as a whole and render on every product page, sourced

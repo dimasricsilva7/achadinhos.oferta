@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { FooterLink } from "@/lib/settings-service";
 
-const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout", "Loja"] as const;
+const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout", "Marketing", "Loja"] as const;
 
 export type SettingsFormInitial = {
   siteName: string;
@@ -33,6 +33,8 @@ export type SettingsFormInitial = {
   checkoutTitle: string | null;
   checkoutSubtitle: string | null;
   checkoutCta: string | null;
+
+  metaPixelId: string | null;
 
   storeLogoUrl: string | null;
   storeRatingAverage: number;
@@ -85,6 +87,8 @@ export function SettingsForm({
   const [checkoutTitle, setCheckoutTitle] = useState(initial.checkoutTitle ?? "");
   const [checkoutSubtitle, setCheckoutSubtitle] = useState(initial.checkoutSubtitle ?? "");
   const [checkoutCta, setCheckoutCta] = useState(initial.checkoutCta ?? "");
+
+  const [metaPixelId, setMetaPixelId] = useState(initial.metaPixelId ?? "");
 
   const [storeLogoUrl, setStoreLogoUrl] = useState(initial.storeLogoUrl ?? "");
   const [storeRatingAverage, setStoreRatingAverage] = useState(initial.storeRatingAverage);
@@ -155,6 +159,7 @@ export function SettingsForm({
       checkoutTitle: checkoutTitle || null,
       checkoutSubtitle: checkoutSubtitle || null,
       checkoutCta: checkoutCta || null,
+      metaPixelId: metaPixelId.trim() || null,
       storeLogoUrl: storeLogoUrl || null,
       storeRatingAverage: Number(storeRatingAverage),
       storeRatingCount: Number(storeRatingCount),
@@ -321,6 +326,31 @@ export function SettingsForm({
           <Field label="Texto do botão (CTA)">
             <input value={checkoutCta} onChange={(e) => setCheckoutCta(e.target.value)} className="input" />
           </Field>
+        </div>
+      )}
+
+      {tab === "Marketing" && (
+        <div className="flex flex-col gap-4">
+          <Field label="Meta Pixel ID">
+            <input
+              value={metaPixelId}
+              onChange={(e) => setMetaPixelId(e.target.value.replace(/\D/g, ""))}
+              inputMode="numeric"
+              placeholder="Ex.: 123456789012345"
+              className="input"
+            />
+          </Field>
+          <p className="text-xs text-foreground/50">
+            ID público do Pixel do Meta (Facebook/Instagram Ads) — encontrado no Gerenciador de Eventos. Quando
+            preenchido, o site injeta o Pixel em todas as páginas e dispara automaticamente &quot;PageView&quot; e,
+            na página de obrigado (após o checkout externo), o evento &quot;Purchase&quot;. Não é um dado
+            sensível — é o mesmo ID que já circula no HTML do navegador de qualquer site com Pixel instalado.
+          </p>
+          <p className="text-xs text-foreground/50">
+            O token de acesso da API de Conversões (Conversions API) é configurado separadamente, direto na
+            Vercel (variável de ambiente <code>META_CAPI_ACCESS_TOKEN</code>) — não existe campo para ele aqui
+            por ser uma credencial sensível.
+          </p>
         </div>
       )}
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import { getSettings } from "@/lib/settings-service";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import "./globals.css";
@@ -64,6 +65,35 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 }`}</style>
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        {settings.metaPixelId && (
+          <>
+            {/* Meta Pixel base code — fires PageView on every page. Purchase is fired
+                separately on /obrigado, alongside the server-side Conversions API call
+                (see src/lib/meta-capi.ts), with a shared eventID for dedup. */}
+            <Script id="meta-pixel-base" strategy="afterInteractive">
+              {`!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '${settings.metaPixelId}');
+fbq('track', 'PageView');`}
+            </Script>
+            <noscript>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                height="1"
+                width="1"
+                style={{ display: "none" }}
+                alt=""
+                src={`https://www.facebook.com/tr?id=${settings.metaPixelId}&ev=PageView&noscript=1`}
+              />
+            </noscript>
+          </>
+        )}
         <div className="flex min-h-full flex-1 flex-col">{children}</div>
         <SiteFooter
           footerText={settings.footerText}
