@@ -128,7 +128,10 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
   const [offerChips, setOfferChips] = useState<OfferChipRow[]>(initial?.offerChips ?? []);
   const [officialBadge, setOfficialBadge] = useState(initial?.officialBadge ?? false);
   const [shippingEnabled, setShippingEnabled] = useState(initial?.shippingEnabled ?? true);
-  const [shippingDeliveryText, setShippingDeliveryText] = useState(initial?.shippingDeliveryText ?? "");
+  // Kept read-only for backward compatibility with existing rows — the storefront no
+  // longer renders it (see ShippingInfo.tsx: delivery date is now always computed
+  // live from the visitor's access day instead of a fixed admin-authored string).
+  const [shippingDeliveryText] = useState(initial?.shippingDeliveryText ?? "");
   const [shippingFree, setShippingFree] = useState(initial?.shippingFree ?? true);
   const [shippingOriginalPrice, setShippingOriginalPrice] = useState(centsToReaisInput(initial?.shippingOriginalPriceCents ?? null));
   const [shippingFinalPrice, setShippingFinalPrice] = useState(centsToReaisInput(initial?.shippingFinalPriceCents ?? null));
@@ -456,18 +459,12 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
             Mostrar bloco de entrega na página do produto
           </label>
           <p className="rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
-            Texto livre e informativo — não há cálculo real de frete. Não afeta o preço nem o checkout.
+            O prazo de entrega mostrado na página é calculado automaticamente (acesso do cliente + 2 dias, pulando
+            domingo) — não é mais um texto fixo, justamente para nunca mostrar uma data já passada em tráfego de
+            anúncio. Não há cálculo real de frete/CEP. Não afeta o preço nem o checkout.
           </p>
           {shippingEnabled && (
             <>
-              <Field label='Texto de entrega (ex.: "Chega entre 13 e 15/ago")'>
-                <input
-                  value={shippingDeliveryText}
-                  onChange={(e) => setShippingDeliveryText(e.target.value)}
-                  placeholder="Chega entre 13 e 15/ago"
-                  className="input"
-                />
-              </Field>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={shippingFree} onChange={(e) => setShippingFree(e.target.checked)} />
                 Frete grátis

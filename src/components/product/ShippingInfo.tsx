@@ -29,12 +29,21 @@ function isCompleteCep(masked: string): boolean {
   return /^\d{5}-\d{3}$/.test(masked);
 }
 
-// Estimated delivery = today + 2 calendar days. Purely a presentational estimate
-// (no real carrier/freight calculation exists in this project — see README
-// roadmap); never used for price or checkout logic.
-function estimateDeliveryLabel(): string {
-  const date = new Date();
+// Estimated delivery = access date + 2 calendar days, pushed to Monday if that lands
+// on a Sunday (no Sunday deliveries). Recomputed on every page load from the
+// visitor's own clock — deliberately NOT a fixed admin-authored date, since this
+// product page is used for ad traffic and a static date goes stale the moment
+// someone visits after it. Purely a presentational estimate (no real carrier/freight
+// calculation exists in this project — see README roadmap); never used for price or
+// checkout logic.
+function estimateDeliveryDate(from: Date = new Date()): Date {
+  const date = new Date(from);
   date.setDate(date.getDate() + 2);
+  if (date.getDay() === 0) date.setDate(date.getDate() + 1); // Sunday -> Monday
+  return date;
+}
+
+function formatDeliveryLabel(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `Chega em até ${day}/${month}`;
@@ -51,20 +60,17 @@ export function ShippingInfo({ shipping }: { shipping: ShippingInfoDTO }) {
   if (!shipping.enabled) return null;
 
   const cepComplete = isCompleteCep(cep);
-  const estimatedDelivery = cepComplete ? estimateDeliveryLabel() : null;
-
-  if (!shipping.deliveryText && !shipping.free && !shipping.enabled) return null;
+  // Always computed from "now" — never the admin's static shippingDeliveryText,
+  // which would show a date from whenever it was typed in the admin instead of
+  // the visitor's actual access day (see comment on estimateDeliveryDate above).
+  const deliveryLabel = formatDeliveryLabel(estimateDeliveryDate());
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border px-3 py-2.5">
       <TruckIcon />
       <div className="flex flex-1 flex-col gap-2 text-sm">
         <div className="flex flex-col gap-0.5">
-          {estimatedDelivery ? (
-            <p className="font-medium text-foreground">{estimatedDelivery}</p>
-          ) : (
-            shipping.deliveryText && <p className="font-medium text-foreground">{shipping.deliveryText}</p>
-          )}
+          <p className="font-medium text-foreground">{deliveryLabel}</p>
           <div className="flex flex-wrap items-center gap-2">
             {shipping.free && <span className="font-medium text-success">Frete grátis</span>}
             {shipping.originalPriceCents !== null && (
@@ -89,7 +95,7 @@ export function ShippingInfo({ shipping }: { shipping: ShippingInfoDTO }) {
             className="w-28 rounded border border-border bg-surface px-2 py-1 text-xs text-foreground focus:border-brand focus:outline-none"
           />
           <span className="text-xs text-foreground/50">
-            {cepComplete ? "Prazo estimado para o seu CEP" : "Digite seu CEP para calcular o prazo"}
+            {cepComplete ? "Prazo confirmado para o seu CEP" : "Digite seu CEP para confirmar o prazo"}
           </span>
         </div>
       </div>
