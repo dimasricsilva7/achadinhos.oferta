@@ -74,8 +74,8 @@ export const reviewHighlightInput = z.object({
 export const productUpsertSchema = z.object({
   slug: z
     .string()
-    .min(1)
-    .regex(/^[a-z0-9-]+$/, "Slug deve conter apenas letras minúsculas, números e hífens"),
+    .regex(/^$|^[a-z0-9-]+$/, "Slug deve conter apenas letras minúsculas, números e hífens")
+    .default(""), // empty is valid — product-service generates one from the name
   name: z.string().min(1).max(200),
   shortDescription: z.string().max(500).optional().nullable(),
   description: z.string().max(20000).optional().nullable(),

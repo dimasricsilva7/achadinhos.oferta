@@ -256,7 +256,10 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
     setSaving(false);
 
     if (!res.ok) {
-      setError(data.error ?? "Não foi possível salvar o produto.");
+      const issues = Array.isArray(data.issues)
+        ? data.issues.map((i: { path: (string | number)[]; message: string }) => `${i.path.join(".") || "campo"}: ${i.message}`).join(" · ")
+        : null;
+      setError(issues ? `${data.error} — ${issues}` : data.error ?? "Não foi possível salvar o produto.");
       return;
     }
     router.push("/admin/products");
