@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PRODUCT_STATUS, REVIEW_STATUS } from "@/lib/constants";
 import { centsToReaisInput, reaisInputToCents } from "@/lib/money";
+import { FallbackImg, FallbackVideo } from "@/components/ui/FallbackMedia";
 
 type ImageRow = { id?: string; url: string; alt: string; type: string; sortOrder: number; isPrimary: boolean };
 type VariantRow = {
@@ -488,13 +489,11 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
             {images.map((img, i) => (
               <div key={i} className="relative w-36">
                 <div className="relative aspect-square overflow-hidden rounded-lg border border-border bg-neutral-100">
-                  {img.url &&
-                    (img.type === "video" ? (
-                      <video src={img.url} className="h-full w-full object-cover" muted loop />
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={img.url} alt="" className="h-full w-full object-cover" />
-                    ))}
+                  {img.type === "video" ? (
+                    <FallbackVideo src={img.url} className="h-full w-full object-cover" muted loop />
+                  ) : (
+                    <FallbackImg src={img.url} alt="" className="h-full w-full object-cover" placeholder={null} />
+                  )}
                   {img.type === "video" && (
                     <span className="absolute right-1 top-1 rounded bg-black/60 px-1 py-0.5 text-[10px] font-medium text-white">
                       Vídeo
@@ -753,10 +752,12 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
                 </div>
                 <div className="flex items-center gap-2">
                   <input placeholder="URL do avatar (opcional)" value={r.avatarUrl} onChange={(e) => updateAt(setReviews, i, { avatarUrl: e.target.value })} className="input" />
-                  {r.avatarUrl && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.avatarUrl} alt="" className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
-                  )}
+                  <FallbackImg
+                    src={r.avatarUrl}
+                    alt=""
+                    className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+                    placeholder={null}
+                  />
                   <label className="flex-shrink-0 cursor-pointer text-xs text-brand">
                     {uploadingAvatarIndex === i ? "Enviando…" : "Enviar foto"}
                     <input

@@ -6,6 +6,7 @@ import { VariantSelector } from "@/components/product/VariantSelector";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { AddonSelector } from "@/components/product/AddonSelector";
 import { formatCentsBRL } from "@/lib/money";
+import { FallbackImg } from "@/components/ui/FallbackMedia";
 
 type BuyState = "idle" | "loading" | "error";
 
@@ -86,10 +87,7 @@ export function PurchaseSheet({
         <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-border bg-neutral-100">
-              {cover && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={cover} alt="" className="h-full w-full object-cover" />
-              )}
+              <FallbackImg src={cover} alt="" className="h-full w-full object-cover" placeholder={null} />
             </div>
             <div className="min-w-0">
               <p className="text-lg font-bold text-price">{formatCentsBRL(priceCents)}</p>

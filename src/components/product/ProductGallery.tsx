@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { ProductImageDTO, ProductVariantDTO } from "@/lib/product-dto";
+import { FallbackImg, FallbackVideo } from "@/components/ui/FallbackMedia";
 
 function PlayBadge({ size = "large" }: { size?: "large" | "small" }) {
   const dims = size === "large" ? 56 : 16;
@@ -63,32 +64,27 @@ export function ProductGallery({
       >
         {items.map((img, i) => (
           <div key={img.id} className="relative flex h-full w-full flex-shrink-0 snap-center items-center justify-center bg-neutral-100">
-            {img.url ? (
-              img.type === "video" ? (
-                // Styled like a looping "GIF" preview (autoplay, muted, loop) rather than
-                // a controls-first player, matching the reference gallery's video tile.
-                <video
-                  src={img.url}
-                  className="h-full w-full object-cover"
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  controls
-                  preload={i === 0 ? "auto" : "metadata"}
-                />
-              ) : (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={img.url}
-                  alt={img.alt || ""}
-                  className="h-full w-full object-cover"
-                  loading={i === 0 ? "eager" : "lazy"}
-                  fetchPriority={i === 0 ? "high" : "auto"}
-                />
-              )
+            {img.type === "video" ? (
+              // Styled like a looping "GIF" preview (autoplay, muted, loop) rather than
+              // a controls-first player, matching the reference gallery's video tile.
+              <FallbackVideo
+                src={img.url}
+                className="h-full w-full object-cover"
+                autoPlay
+                muted
+                loop
+                controls
+                playsInline
+                preload={i === 0 ? "auto" : "metadata"}
+              />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-sm text-foreground/40">Sem imagem</div>
+              <FallbackImg
+                src={img.url}
+                alt={img.alt || ""}
+                className="h-full w-full object-cover"
+                loading={i === 0 ? "eager" : "lazy"}
+                fetchPriority={i === 0 ? "high" : "auto"}
+              />
             )}
           </div>
         ))}
@@ -139,10 +135,7 @@ export function ProductGallery({
                     selected ? "border-brand" : "border-transparent"
                   }`}
                 >
-                  {thumb ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumb} alt="" className="h-full w-full object-cover" />
-                  ) : null}
+                  <FallbackImg src={thumb} alt="" className="h-full w-full object-cover" placeholder={null} />
                 </button>
               );
             })}
@@ -162,10 +155,7 @@ export function ProductGallery({
                 i === index ? "border-brand" : "border-transparent"
               }`}
             >
-              {img.url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={img.url} alt="" className="h-full w-full object-cover" />
-              ) : null}
+              <FallbackImg src={img.url} alt="" className="h-full w-full object-cover" placeholder={null} />
               {img.type === "video" && <PlayBadge size="small" />}
             </button>
           ))}

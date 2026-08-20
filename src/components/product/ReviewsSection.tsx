@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ReviewDTO, ReviewHighlightDTO } from "@/lib/product-dto";
 import { RatingSummary } from "@/components/product/RatingSold";
 import { ReviewCard } from "@/components/product/ReviewCard";
+import { FallbackImg } from "@/components/ui/FallbackMedia";
 
 function SearchIcon() {
   return (
@@ -75,8 +76,7 @@ export function ReviewsSection({
               key={m.id}
               className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-border bg-neutral-100"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={m.thumbnailUrl || m.url} alt="" className="h-full w-full object-cover" />
+              <FallbackImg src={m.thumbnailUrl || m.url} alt="" className="h-full w-full object-cover" placeholder={null} />
               {m.type === "video" && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/25">
                   <PlayIcon />

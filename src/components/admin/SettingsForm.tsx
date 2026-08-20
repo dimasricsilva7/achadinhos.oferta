@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { FooterLink } from "@/lib/settings-service";
+import { FallbackImg } from "@/components/ui/FallbackMedia";
 
 const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout", "Marketing", "Loja"] as const;
 
@@ -528,12 +529,12 @@ function ImageField({
     <Field label={label}>
       <div className="flex items-center gap-3">
         <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-border bg-neutral-100">
-          {url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={url} alt="" className="h-full w-full object-contain" />
-          ) : (
-            <span className="text-[10px] text-foreground/40">sem imagem</span>
-          )}
+          <FallbackImg
+            src={url}
+            alt=""
+            className="h-full w-full object-contain"
+            placeholder={<span className="text-[10px] text-foreground/40">sem imagem</span>}
+          />
         </div>
         <input
           type="file"

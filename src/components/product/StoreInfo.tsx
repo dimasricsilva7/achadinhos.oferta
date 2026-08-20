@@ -1,5 +1,6 @@
 import type { RelatedProductDTO, StoreInfoDTO } from "@/lib/product-dto";
 import { formatCentsBRL } from "@/lib/money";
+import { FallbackImg } from "@/components/ui/FallbackMedia";
 
 function Star({ filled }: { filled: boolean }) {
   return (
@@ -25,14 +26,16 @@ export function StoreInfo({ store, relatedProducts }: { store: StoreInfoDTO; rel
   return (
     <div className="flex flex-col gap-4 border-t border-border pt-4">
       <div className="flex items-center gap-3 rounded-lg border border-border p-3">
-        {store.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={store.logoUrl} alt="" className="h-12 w-12 flex-shrink-0 rounded-full object-cover" />
-        ) : (
-          <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-brand/10 text-sm font-semibold text-brand">
-            {initials(store.name)}
-          </span>
-        )}
+        <FallbackImg
+          src={store.logoUrl}
+          alt=""
+          className="h-12 w-12 flex-shrink-0 rounded-full object-cover"
+          placeholder={
+            <span className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-brand/10 text-sm font-semibold text-brand">
+              {initials(store.name)}
+            </span>
+          }
+        />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5">
             <p className="truncate text-sm font-semibold text-foreground">{store.name}</p>
@@ -69,12 +72,7 @@ export function StoreInfo({ store, relatedProducts }: { store: StoreInfoDTO; rel
                 className="flex w-28 flex-shrink-0 flex-col gap-1 overflow-hidden rounded-[var(--radius-card)] border border-border bg-surface"
               >
                 <div className="aspect-square w-full overflow-hidden bg-neutral-100">
-                  {p.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={p.imageUrl} alt="" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center text-[10px] text-foreground/40">Sem imagem</div>
-                  )}
+                  <FallbackImg src={p.imageUrl} alt="" className="h-full w-full object-cover" />
                 </div>
                 <div className="flex flex-col gap-0.5 px-1.5 pb-1.5">
                   <p className="line-clamp-2 text-[11px] leading-snug text-foreground/80">{p.name}</p>
