@@ -43,19 +43,23 @@ function resolveRange(range: string, fromParam: string | null, toParam: string |
 }
 
 // Polled every 5s by the admin dashboard client component. Numbers here are always
-// derived from Order rows in our own DB — never a fabricated "saldo disponível"
-// (Section 80): we have no confirmed gateway balance API for pagseguropix.org.
+// derived from Order rows in our own DB. Since checkout-bravopay confirms payment via
+// BravoPay's webhook (POST /api/public/orders/[orderNumber]/confirm-payment), PAID is
+// now a real, gateway-confirmed status — grossRevenueCents (all orders, incl. pending)
+// and paidRevenueCents (PAID only) are both meaningful, not just a guess.
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
   const range = searchParams.get("range") ?? "today";
   const { from, to } = resolveRange(range, searchParams.get("from"), searchParams.get("to"));
 
   const where = { createdAt: { gte: from, lte: to } };
+  const paidWhere = { ...where, status: "PAID" };
 
-  const [totalOrders, byStatus, revenueAgg] = await Promise.all([
+  const [totalOrders, byStatus, revenueAgg, paidRevenueAgg] = await Promise.all([
     db.order.count({ where }),
     db.order.groupBy({ by: ["status"], where, _count: { _all: true } }),
     db.order.aggregate({ where, _sum: { totalCents: true }, _avg: { totalCents: true } }),
+    db.order.aggregate({ where: paidWhere, _sum: { totalCents: true }, _avg: { totalCents: true } }),
   ]);
 
   const statusCounts = Object.fromEntries(byStatus.map((row) => [row.status, row._count._all]));
@@ -68,5 +72,7 @@ export async function GET(req: NextRequest) {
     statusCounts,
     grossRevenueCents: revenueAgg._sum.totalCents ?? 0,
     averageTicketCents: Math.round(revenueAgg._avg.totalCents ?? 0),
+    paidRevenueCents: paidRevenueAgg._sum.totalCents ?? 0,
+    paidAverageTicketCents: Math.round(paidRevenueAgg._avg.totalCents ?? 0),
   });
 }

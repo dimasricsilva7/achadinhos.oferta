@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { formatCentsBRL } from "@/lib/money";
-import { ADMIN_SETTABLE_ORDER_STATUS } from "@/lib/constants";
 
 type OrderRow = {
   id: string;
@@ -19,25 +18,27 @@ type OrderRow = {
   variant: { label: string; groupName: string } | null;
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  PENDING: "Pendente",
-  PAID: "Pago",
-  PROCESSING: "Processando",
-  SHIPPED: "Enviado",
-  DELIVERED: "Entregue",
-  CANCELLED: "Cancelado",
-  REFUNDED: "Reembolsado",
-};
-
-const STATUS_DOT: Record<string, string> = {
-  PENDING: "bg-neutral-400",
-  PAID: "bg-success",
-  PROCESSING: "bg-brand",
-  SHIPPED: "bg-brand",
-  DELIVERED: "bg-success",
-  CANCELLED: "bg-price",
-  REFUNDED: "bg-price",
-};
+// The checkout confirms PAID automatically the moment BravoPay approves the Pix —
+// there is no manual in-between state to set anymore, so the admin only ever sees one
+// of these two. (Older orders that predate this checkout may still carry a legacy
+// status like PROCESSING/SHIPPED; those just render with the neutral "Pendente" look
+// here rather than a third badge style.)
+function StatusBadge({ status }: { status: string }) {
+  if (status === "PAID") {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
+        <span className="h-1.5 w-1.5 rounded-full bg-success" />
+        Pago
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-warning/10 px-2.5 py-1 text-xs font-semibold text-warning">
+      <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+      Pendente
+    </span>
+  );
+}
 
 function formatCpf(cpf: string | null): string {
   if (!cpf) return "-";
@@ -98,17 +99,6 @@ export default function AdminOrdersPage() {
     return () => clearInterval(interval);
   }, [load]);
 
-  async function handleStatusChange(id: string, status: string) {
-    setBusyId(id);
-    await fetch(`/api/admin/orders/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    setBusyId(null);
-    load();
-  }
-
   async function handleDelete(id: string, orderNumber: string) {
     if (!confirm(`Excluir o pedido ${orderNumber}? Essa ação não pode ser desfeita.`)) return;
     setBusyId(id);
@@ -122,18 +112,15 @@ export default function AdminOrdersPage() {
       <h1 className="mb-6 text-lg font-bold text-foreground">Pedidos</h1>
 
       <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="mb-4 rounded-lg border border-border px-3 py-2 text-sm">
-        <option value="">Todos os status</option>
-        {Object.entries(STATUS_LABEL).map(([value, label]) => (
-          <option key={value} value={value}>
-            {label}
-          </option>
-        ))}
+        <option value="">Todos</option>
+        <option value="PENDING">Pendente</option>
+        <option value="PAID">Pago</option>
       </select>
 
       <p className="mb-3 max-w-2xl text-xs text-foreground/50">
-        Pedidos são criados como &quot;Pendente&quot; assim que o cliente é enviado ao checkout. O status muda para
-        &quot;Pago&quot; automaticamente quando o checkout confirma o PIX — atualize manualmente só para os status
-        seguintes (processando, enviado, entregue...). Atualiza sozinho a cada 5s.
+        Pedidos nascem &quot;Pendente&quot; assim que o cliente é enviado ao checkout, e viram &quot;Pago&quot;
+        automaticamente assim que o checkout confirma o Pix na BravoPay — nada aqui precisa de atualização manual.
+        Atualiza sozinho a cada 5s.
       </p>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -184,24 +171,7 @@ export default function AdminOrdersPage() {
                   </td>
                   <td className="px-4 py-3 font-medium">{formatCentsBRL(o.totalCents)}</td>
                   <td className="px-4 py-3">
-                    <div className="flex items-center gap-1.5">
-                      <span className={`h-2 w-2 flex-shrink-0 rounded-full ${STATUS_DOT[o.status] ?? "bg-neutral-400"}`} />
-                      <select
-                        value={o.status}
-                        disabled={busyId === o.id}
-                        onChange={(e) => handleStatusChange(o.id, e.target.value)}
-                        className="rounded border border-border px-2 py-1 text-xs transition-colors duration-150 focus:border-brand focus:outline-none disabled:opacity-50"
-                      >
-                        <option value="PENDING" disabled>
-                          Pendente
-                        </option>
-                        {ADMIN_SETTABLE_ORDER_STATUS.map((s) => (
-                          <option key={s} value={s}>
-                            {STATUS_LABEL[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                    <StatusBadge status={o.status} />
                     {o.status === "PENDING" && (wa || mail) && (
                       <div className="mt-2 flex gap-2">
                         {wa && (
