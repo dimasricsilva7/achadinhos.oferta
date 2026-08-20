@@ -17,9 +17,12 @@ export const ORDER_STATUS = [
 export type OrderStatus = (typeof ORDER_STATUS)[number];
 
 // Order statuses an admin may set manually from the order list. PENDING is the only
-// status the system itself ever writes (see src/app/api/checkout/start/route.ts) —
-// there is no confirmed webhook/API from the external checkout, so every status past
-// PENDING is a manual admin action, never inferred.
+// status excluded — it's written once by POST /api/checkout/start and nothing should
+// let an admin fake it back from the UI. PAID is normally written automatically by
+// POST /api/public/orders/[orderNumber]/confirm-payment (called by checkout-bravopay
+// once BravoPay confirms the PIX), but stays admin-settable too so a missed
+// webhook/notification can be corrected manually after checking the BravoPay
+// dashboard.
 export const ADMIN_SETTABLE_ORDER_STATUS = ORDER_STATUS.filter((s) => s !== "PENDING");
 
 // PUBLISHED reviews render on the storefront; HIDDEN ones are kept (moderation) but

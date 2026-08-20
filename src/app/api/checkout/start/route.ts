@@ -43,9 +43,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (!effective.checkoutUrl) {
+  // effective.checkoutUrl is only a per-product/variant override (rare). The normal
+  // path is env.CHECKOUT_BASE_URL — the checkout-bravopay app — with the orderNumber
+  // appended so it can look up product/price via GET /api/public/orders/[orderNumber].
+  const checkoutBase = effective.checkoutUrl || process.env.CHECKOUT_BASE_URL;
+  if (!checkoutBase) {
     return NextResponse.json(
-      { error: "Checkout não configurado para este produto. Configure a URL de checkout no painel administrativo." },
+      { error: "Checkout não configurado. Defina CHECKOUT_BASE_URL ou a URL de checkout no painel administrativo." },
       { status: 422 }
     );
   }
@@ -72,12 +76,15 @@ export async function POST(req: NextRequest) {
       totalCents: effective.priceCents * quantity + addonsCents,
       addonsSnapshot: addonsSnapshot.length > 0 ? JSON.stringify(addonsSnapshot) : null,
       status: "PENDING",
-      checkoutUrl: effective.checkoutUrl,
+      checkoutUrl: checkoutBase,
     },
   });
 
+  const separator = checkoutBase.includes("?") ? "&" : "?";
+  const checkoutUrl = `${checkoutBase}${separator}pedido=${encodeURIComponent(order.orderNumber)}`;
+
   return NextResponse.json({
     orderNumber: order.orderNumber,
-    checkoutUrl: effective.checkoutUrl,
+    checkoutUrl,
   });
 }

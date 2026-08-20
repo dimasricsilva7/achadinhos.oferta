@@ -72,10 +72,12 @@ model Product {
   shippingOriginalPriceCents  Int?
   shippingFinalPriceCents     Int? // 0 = grátis com cupom
 
-  // Checkout integration: the real, verified contract with the external checkout
-  // (pagseguropix.org / bravopay.club) is a pre-built static page per slug — there is
-  // no discovered mechanism to pass product/price/qty via query params. So each
-  // product (or variant) carries its own pre-built checkout URL.
+  // Checkout integration: normally left empty — POST /api/checkout/start builds the
+  // real checkout URL itself from env.CHECKOUT_BASE_URL + the generated orderNumber
+  // (see that route), and checkout-bravopay fetches product/price live from
+  // GET /api/public/orders/[orderNumber]. This field only exists as a per-product (or
+  // per-variant) override, for the rare case a specific product needs a different
+  // checkout destination.
   checkoutUrl String?
 
   deletedAt DateTime? // soft delete — orders must keep referencing the product
@@ -225,13 +227,28 @@ model Order {
   totalCents     Int
   addonsSnapshot String? // JSON-encoded [{ id, title, priceCents }] — audit of what was charged
 
-  // PENDING = intent created, user sent to external checkout.
-  // No webhook/API access into pagseguropix.org was found (see README) — status
-  // beyond PENDING is set manually by an admin from confirmed payment evidence,
-  // never inferred automatically.
+  // PENDING = intent created, user sent to the checkout (checkout-bravopay).
+  // PAID is set automatically by POST /api/public/orders/[orderNumber]/confirm-payment,
+  // called server-to-server by checkout-bravopay once BravoPay confirms the PIX —
+  // see that route for the shared-secret check. Any status past PAID (PROCESSING,
+  // SHIPPED, ...) is still a manual admin action.
   status String @default("PENDING") // OrderStatus
 
   checkoutUrl String // exact URL the customer was redirected to, for audit
+
+  // Filled in by confirm-payment once the customer pays — checkout-bravopay collects
+  // these on its own form (this project never renders them) since the gateway's
+  // native checkout had no address field, which was suspected to be costing sales.
+  customerName    String?
+  customerEmail   String?
+  customerPhone   String?
+  customerCpf     String?
+  shippingAddress String? // JSON-encoded { cep, street, number, complement, neighborhood, city, state }
+
+  // BravoPay transaction id (tx_xxx), set by confirm-payment — useful for support
+  // lookups against the BravoPay dashboard.
+  gatewayTransactionId String?
+  paidAt               DateTime?
 
   // Set once the Meta Conversions API "Purchase" event for this order is sent
   // successfully from /api/meta/purchase — lets that route be idempotent (a page
