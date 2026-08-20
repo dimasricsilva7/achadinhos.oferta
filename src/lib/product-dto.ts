@@ -214,7 +214,13 @@ export function toProductDTO(product: FullProduct): ProductDTO {
       originalPriceCents: product.shippingOriginalPriceCents,
       finalPriceCents: product.shippingFinalPriceCents,
     },
-    hasCheckout: Boolean(product.checkoutUrl) || product.variants.some((v) => v.checkoutUrl),
+    // A product/variant checkoutUrl is only ever a per-item override now (see
+    // /api/checkout/start) — the normal path is env.CHECKOUT_BASE_URL, so checkout is
+    // available whenever either one is set.
+    hasCheckout:
+      Boolean(process.env.CHECKOUT_BASE_URL) ||
+      Boolean(product.checkoutUrl) ||
+      product.variants.some((v) => v.checkoutUrl),
     images: product.images,
     variants: product.variants.map((v) => ({
       id: v.id,
