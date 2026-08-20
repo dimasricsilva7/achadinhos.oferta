@@ -314,8 +314,6 @@ export async function duplicateProduct(id: string) {
       sortOrder: v.sortOrder,
     }))
   );
-  // Addons are copied (they're product configuration); reviews are NOT — reviews are
-  // real customer content and must not be fabricated onto an unrelated new product.
   await replaceAddons(
     copy.id,
     source.addons.map((a) => ({
@@ -325,6 +323,22 @@ export async function duplicateProduct(id: string) {
       priceCents: a.priceCents,
       sortOrder: a.sortOrder,
       enabled: a.enabled,
+    }))
+  );
+  // Reviews here are admin-authored social proof, not verified-purchase records (see
+  // Review model comment) — copying them onto the duplicate saves having to rebuild a
+  // review set by hand each time; the admin edits the copies from there.
+  await replaceReviews(
+    copy.id,
+    source.reviews.map((r) => ({
+      customerName: r.customerName,
+      avatarUrl: r.avatarUrl,
+      rating: r.rating,
+      variantLabel: r.variantLabel,
+      comment: r.comment,
+      helpfulCount: r.helpfulCount,
+      status: r.status,
+      media: r.media.map((m) => ({ url: m.url, type: m.type, thumbnailUrl: m.thumbnailUrl, sortOrder: m.sortOrder })),
     }))
   );
 
