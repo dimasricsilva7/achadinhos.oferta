@@ -37,7 +37,7 @@ async function loadOrder(orderNumber: string) {
   return db.order.findUnique({
     where: { orderNumber },
     include: {
-      product: { include: { images: { where: { isPrimary: true }, take: 1 } } },
+      product: { include: { images: { where: { type: "image" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 } } },
       variant: true,
     },
   });

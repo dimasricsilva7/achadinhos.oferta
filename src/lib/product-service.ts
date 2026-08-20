@@ -380,7 +380,9 @@ export async function getRelatedStoreProducts(excludeProductId: string, pickedId
   if (ids.length > 0) {
     const picked = await db.product.findMany({
       where: { id: { in: ids }, status: "ACTIVE", deletedAt: null },
-      include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
+      // type: "image" — the gallery often leads with a video (sortOrder 0), which
+      // would otherwise become this card's thumbnail and fail to render in an <img>.
+      include: { images: { where: { type: "image" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 } },
     });
     const byId = new Map(picked.map((p) => [p.id, p]));
     return ids.map((id) => byId.get(id)).filter((p): p is NonNullable<typeof p> => Boolean(p)).slice(0, limit);
@@ -390,7 +392,7 @@ export async function getRelatedStoreProducts(excludeProductId: string, pickedId
     where: { status: "ACTIVE", deletedAt: null, id: { not: excludeProductId } },
     orderBy: { soldCount: "desc" },
     take: limit,
-    include: { images: { orderBy: { sortOrder: "asc" }, take: 1 } },
+    include: { images: { where: { type: "image" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 } },
   });
 }
 

@@ -3,13 +3,14 @@ import { db } from "@/lib/db";
 import { formatCentsBRL } from "@/lib/money";
 import { getSettings } from "@/lib/settings-service";
 import { SiteHeader } from "@/components/site/SiteHeader";
+import { FallbackImg } from "@/components/ui/FallbackMedia";
 
 export default async function HomePage() {
   const [products, settings] = await Promise.all([
     db.product.findMany({
       where: { status: "ACTIVE", deletedAt: null },
       orderBy: { createdAt: "desc" },
-      include: { images: { where: { isPrimary: true }, take: 1 } },
+      include: { images: { where: { type: "image" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 } },
     }),
     getSettings(),
   ]);
@@ -39,10 +40,7 @@ export default async function HomePage() {
                   className="group overflow-hidden rounded-lg border border-border bg-surface transition-shadow hover:shadow-md"
                 >
                   <div className="aspect-square bg-neutral-100">
-                    {image ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={image} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
-                    ) : null}
+                    <FallbackImg src={image} alt={p.name} className="h-full w-full object-cover" loading="lazy" />
                   </div>
                   <div className="p-2">
                     <p className="line-clamp-2 text-xs text-foreground/80">{p.name}</p>

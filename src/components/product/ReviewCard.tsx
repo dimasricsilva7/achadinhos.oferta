@@ -61,7 +61,15 @@ export function ReviewCard({ review }: { review: ReviewDTO }) {
         <div className="flex gap-2 overflow-x-auto pb-1">
           {review.media.map((m) => (
             <div key={m.id} className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-lg border border-border bg-neutral-100">
-              <FallbackImg src={m.thumbnailUrl || m.url} alt="" className="h-full w-full object-cover" placeholder={null} />
+              {/* Videos have no guaranteed thumbnailUrl, and their .url is a video file —
+                  rendering that in an <img> always fails (naturalWidth 0, broken-image
+                  glyph). Only fall back to .url for actual images. */}
+              <FallbackImg
+                src={m.type === "video" ? m.thumbnailUrl : m.thumbnailUrl || m.url}
+                alt=""
+                className="h-full w-full object-cover"
+                placeholder={null}
+              />
               {m.type === "video" && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/25">
                   <PlayIcon />

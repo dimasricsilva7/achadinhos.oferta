@@ -73,7 +73,9 @@ export function PurchaseSheet({
 
   if (!open) return null;
 
-  const cover = imageUrl || product.images.find((i) => i.isPrimary)?.url || product.images[0]?.url || "";
+  // Variant imageUrl aside, only ever cover with an actual image — never a video URL.
+  const stillImages = product.images.filter((i) => i.type === "image");
+  const cover = imageUrl || stillImages.find((i) => i.isPrimary)?.url || stillImages[0]?.url || "";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center">

@@ -210,9 +210,12 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
       const url = await uploadFile(file);
       if (!url) return;
       const isVideo = file.type.startsWith("video/");
+      // A video can never be the primary thumbnail (it can't render where a still
+      // image is expected — cards, og:image, etc.) — only default isPrimary true when
+      // this is the first still image, not just the first item in the gallery.
       setImages((prev) => [
         ...prev,
-        { url, alt: name, type: isVideo ? "video" : "image", sortOrder: prev.length, isPrimary: prev.length === 0 },
+        { url, alt: name, type: isVideo ? "video" : "image", sortOrder: prev.length, isPrimary: !isVideo && !prev.some((im) => im.type === "image") },
       ]);
     } finally {
       setUploading(false);
@@ -508,7 +511,12 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
                 />
                 <select
                   value={img.type}
-                  onChange={(e) => updateAt(setImages, i, { type: e.target.value })}
+                  onChange={(e) =>
+                    updateAt(setImages, i, {
+                      type: e.target.value,
+                      isPrimary: e.target.value === "video" ? false : img.isPrimary,
+                    })
+                  }
                   className="input mt-1 text-xs"
                 >
                   <option value="image">Imagem</option>
@@ -521,15 +529,21 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
                 >
                   Remover
                 </button>
-                <label className="flex items-center gap-1 text-xs">
-                  <input
-                    type="radio"
-                    name="primaryImage"
-                    checked={img.isPrimary}
-                    onChange={() => setImages((prev) => prev.map((im, idx) => ({ ...im, isPrimary: idx === i })))}
-                  />
-                  Principal
-                </label>
+                {img.type === "image" ? (
+                  <label className="flex items-center gap-1 text-xs">
+                    <input
+                      type="radio"
+                      name="primaryImage"
+                      checked={img.isPrimary}
+                      onChange={() => setImages((prev) => prev.map((im, idx) => ({ ...im, isPrimary: idx === i })))}
+                    />
+                    Principal
+                  </label>
+                ) : (
+                  // A video can't be the primary thumbnail — it can't render where a
+                  // still image is expected (cards, og:image, etc).
+                  <p className="text-[10px] text-foreground/40">Vídeos não podem ser a imagem principal</p>
+                )}
               </div>
             ))}
           </div>

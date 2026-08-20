@@ -59,7 +59,7 @@ export function Benefits({ benefits }: { benefits: ProductBenefitDTO[] }) {
       {benefits.map((b) => {
         const Icon = ICONS[b.icon] ?? CheckIcon;
         return (
-          <li key={b.id} className="flex items-center gap-2 rounded-lg border border-border p-2 text-xs text-foreground/80">
+          <li key={b.id} className="flex items-center gap-2 rounded-lg border border-brand/40 p-2 text-xs text-foreground/80">
             <span aria-hidden className="flex-shrink-0 text-brand">
               <Icon />
             </span>

@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
       orderBy: { updatedAt: "desc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
-      include: { images: { where: { isPrimary: true }, take: 1 } },
+      include: { images: { where: { type: "image" }, orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }], take: 1 } },
     }),
     db.product.count({ where }),
   ]);

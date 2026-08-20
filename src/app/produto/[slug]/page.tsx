@@ -14,7 +14,9 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const product = await getProductBySlugForStorefront(slug);
   if (!product) return { title: "Produto não encontrado" };
 
-  const primaryImage = product.images.find((i) => i.isPrimary)?.url ?? product.images[0]?.url;
+  // og:image must be an actual image — a video URL here breaks link previews.
+  const stillImages = product.images.filter((i) => i.type === "image");
+  const primaryImage = stillImages.find((i) => i.isPrimary)?.url ?? stillImages[0]?.url;
 
   return {
     title: product.name,
