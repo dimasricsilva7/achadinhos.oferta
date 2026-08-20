@@ -534,6 +534,42 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
               </div>
             ))}
           </div>
+
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-background p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Enviar do computador</p>
+              <p className="text-xs text-foreground/50">Imagem até 5MB ou vídeo até 20MB (jpg, png, webp, avif, mp4, webm)</p>
+            </div>
+            <label
+              className={`inline-flex w-fit shrink-0 cursor-pointer items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors duration-150 ${
+                uploading ? "cursor-not-allowed bg-neutral-300" : "bg-brand hover:bg-brand-dark active:brightness-95"
+              }`}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M12 3v12M7 8l5-5 5 5M5 21h14" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {uploading ? "Enviando…" : "Escolher arquivo"}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleUpload(file);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                disabled={uploading}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-foreground/40">
+            <span className="h-px flex-1 bg-border" />
+            ou
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
           <button
             type="button"
             onClick={() => setImages((prev) => [...prev, { url: "", alt: name, type: "image", sortOrder: prev.length, isPrimary: prev.length === 0 }])}
@@ -541,19 +577,6 @@ export function ProductForm({ initial }: { initial?: ProductFormInitial }) {
           >
             + Adicionar imagem/vídeo por URL
           </button>
-          <p className="text-xs text-foreground/50">Ou envie um arquivo (imagem até 5MB, vídeo até 20MB):</p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/avif,video/mp4,video/webm"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleUpload(file);
-              if (fileInputRef.current) fileInputRef.current.value = "";
-            }}
-            disabled={uploading}
-          />
-          {uploading && <p className="text-xs text-foreground/50">Enviando…</p>}
         </div>
       )}
 
