@@ -3,8 +3,12 @@ import { Resend } from "resend";
 import { db } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { logAudit } from "@/lib/audit";
+import { formatCentsBRL } from "@/lib/money";
 
 type Params = { params: Promise<{ id: string }> };
+
+const SHOPEE_LOGO = "https://upload.wikimedia.org/wikipedia/commons/f/fe/Shopee.svg";
+const BRAND = "#EE4D2D";
 
 // Sends a one-off "you left something in your cart" email for a PENDING order,
 // from the checkout's own domain (pagamento-shopee.com.br) via Resend — a real send,
@@ -35,6 +39,12 @@ export async function POST(_req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Este pedido já foi pago" }, { status: 409 });
   }
 
+  const image = await db.productImage.findFirst({
+    where: { productId: order.productId, type: "image" },
+    orderBy: [{ isPrimary: "desc" }, { sortOrder: "asc" }],
+    select: { url: true },
+  });
+
   const checkoutBase = (process.env.CHECKOUT_BASE_URL || "").replace(/\/$/, "");
   const resumeUrl = checkoutBase ? `${checkoutBase}/?pedido=${encodeURIComponent(order.orderNumber)}` : null;
   const firstName = order.customerName?.trim().split(" ")[0] || "";
@@ -46,7 +56,13 @@ export async function POST(_req: NextRequest, { params }: Params) {
       from: fromEmail,
       to: order.customerEmail,
       subject: "Você esqueceu algo no carrinho 🛒",
-      html: buildEmailHtml({ firstName, productName: order.product.name, resumeUrl }),
+      html: buildEmailHtml({
+        firstName,
+        productName: order.product.name,
+        productImage: image?.url ?? null,
+        totalCents: order.totalCents,
+        resumeUrl,
+      }),
     });
 
     if (error) {
@@ -72,29 +88,86 @@ export async function POST(_req: NextRequest, { params }: Params) {
 function buildEmailHtml({
   firstName,
   productName,
+  productImage,
+  totalCents,
   resumeUrl,
 }: {
   firstName: string;
   productName: string;
+  productImage: string | null;
+  totalCents: number;
   resumeUrl: string | null;
 }): string {
-  const greeting = firstName ? `Oi, ${firstName}!` : "Oi!";
+  const greeting = firstName ? `Oi, ${firstName}! 👋` : "Oi! 👋";
+  const productImageCell = productImage
+    ? `<td width="64" style="width:64px;padding-right:14px;vertical-align:top;">
+         <img src="${escapeHtml(productImage)}" width="64" height="64" alt="" style="display:block;width:64px;height:64px;border-radius:10px;object-fit:cover;border:1px solid #e5e7eb;" />
+       </td>`
+    : "";
   const button = resumeUrl
-    ? `<a href="${resumeUrl}" style="display:inline-block;background:#EE4D2D;color:#ffffff;text-decoration:none;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;">Finalizar minha compra</a>`
+    ? `<a href="${resumeUrl}" style="display:inline-block;background:${BRAND};color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:10px;font-weight:700;font-size:15px;">Finalizar minha compra</a>`
     : "";
 
   return `
-  <div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#14161a;">
-    <h1 style="font-size:20px;margin:0 0 12px;">${greeting}</h1>
-    <p style="font-size:14px;line-height:1.6;color:#4b5563;">
-      Vimos que você começou a comprar <strong>${escapeHtml(productName)}</strong> mas o pagamento não foi concluído.
-    </p>
-    <p style="font-size:14px;line-height:1.6;color:#4b5563;">
-      Seu pedido ainda está reservado — é só finalizar o pagamento pelo Pix.
-    </p>
-    <div style="margin:24px 0;">${button}</div>
-    <p style="font-size:12px;color:#9ca3af;">Se você já resolveu isso, pode ignorar este e-mail.</p>
-  </div>`;
+<!DOCTYPE html>
+<html lang="pt-BR">
+<body style="margin:0;padding:0;background:#f5f6f8;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table role="presentation" width="480" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+
+          <tr>
+            <td style="background:${BRAND};padding:20px 28px;">
+              <img src="${SHOPEE_LOGO}" alt="Shopee" height="22" style="display:block;filter:brightness(0) invert(1);" />
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:28px;">
+              <h1 style="font-size:19px;margin:0 0 8px;color:#14161a;">${greeting}</h1>
+              <p style="font-size:14px;line-height:1.6;color:#4b5563;margin:0 0 20px;">
+                Vimos que você começou a comprar mas o pagamento não foi concluído. Seu pedido ainda está reservado.
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f5f6f8;border-radius:12px;margin-bottom:22px;">
+                <tr>
+                  <td style="padding:14px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        ${productImageCell}
+                        <td style="vertical-align:top;">
+                          <p style="margin:0;font-size:13px;font-weight:600;color:#14161a;line-height:1.4;">${escapeHtml(productName)}</p>
+                          <p style="margin:6px 0 0;font-size:17px;font-weight:700;color:${BRAND};">${formatCentsBRL(totalCents)}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                <tr>
+                  <td align="center">${button}</td>
+                </tr>
+              </table>
+
+              <p style="font-size:12px;color:#9ca3af;text-align:center;margin:16px 0 0;">Se você já resolveu isso, pode ignorar este e-mail.</p>
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:18px 28px;border-top:1px solid #e5e7eb;">
+              <p style="font-size:11px;color:#9ca3af;margin:0;text-align:center;">Pagamento processado com segurança via Pix.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 }
 
 function escapeHtml(text: string): string {
