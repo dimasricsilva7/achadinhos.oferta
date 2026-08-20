@@ -59,7 +59,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     const { error } = await resend.emails.send({
       from: fromEmail,
       to: order.customerEmail,
-      subject: "Você esqueceu algo no carrinho 🛒",
+      subject: "Pedido Shopee - Seu pagamento está te esperando",
       html: buildEmailHtml({
         firstName,
         productName: order.product.name,
