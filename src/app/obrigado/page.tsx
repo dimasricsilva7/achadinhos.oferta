@@ -167,13 +167,14 @@ type Bump = { id: string; title: string; description: string; imageUrl: string |
 // see its src/routes/bumps.js). Best-effort: this section simply doesn't render if
 // checkout-bravopay is unreachable or CHECKOUT_BASE_URL isn't set, since it's an
 // upsell, never part of the critical thank-you-page path.
-async function loadPostPurchaseBumps(): Promise<Bump[]> {
+async function loadPostPurchaseBumps(productSlug: string): Promise<Bump[]> {
   const base = process.env.CHECKOUT_BASE_URL;
   if (!base) return [];
   try {
-    const res = await fetch(`${base.replace(/\/$/, "")}/api/order-bumps?placement=post-purchase`, {
-      cache: "no-store",
-    });
+    const res = await fetch(
+      `${base.replace(/\/$/, "")}/api/order-bumps?placement=post-purchase&productSlug=${encodeURIComponent(productSlug)}`,
+      { cache: "no-store" }
+    );
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data.bumps) ? data.bumps : [];
@@ -246,7 +247,7 @@ export default async function ObrigadoPage({
     getSettings(),
   ]);
 
-  const bumps = order && order.status === "PAID" ? await loadPostPurchaseBumps() : [];
+  const bumps = order && order.status === "PAID" ? await loadPostPurchaseBumps(order.product.slug) : [];
   const firstName = order?.customerName?.trim().split(" ")[0];
 
   return (

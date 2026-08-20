@@ -38,6 +38,7 @@ export async function GET(req: NextRequest, { params }: Params) {
   const base = {
     orderNumber: order.orderNumber,
     productName: order.product.name,
+    productSlug: order.product.slug,
     productImage: image,
     quantity: order.quantity,
     totalCents: order.totalCents,
