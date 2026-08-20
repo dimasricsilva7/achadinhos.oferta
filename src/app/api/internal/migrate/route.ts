@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
     `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "shippingAddress" TEXT`,
     `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "gatewayTransactionId" TEXT`,
     `ALTER TABLE "Order" ADD COLUMN IF NOT EXISTS "paidAt" TIMESTAMP(3)`,
+    `UPDATE "Product" SET "checkoutUrl" = NULL WHERE "checkoutUrl" IS NOT NULL`,
+    `UPDATE "ProductVariant" SET "checkoutUrl" = NULL WHERE "checkoutUrl" IS NOT NULL`,
   ];
 
   const results: string[] = [];
