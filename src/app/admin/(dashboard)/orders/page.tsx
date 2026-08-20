@@ -64,19 +64,13 @@ function whatsappHref(phone: string | null, productName: string, orderNumber: st
   return `https://wa.me/${withCountry}?text=${text}`;
 }
 
-function emailHref(email: string | null, productName: string, orderNumber: string): string | null {
-  if (!email) return null;
-  const subject = encodeURIComponent("Seu pedido está esperando por você!");
-  const body = encodeURIComponent(
-    `Oi!\n\nVimos que você começou a comprar "${productName}" (pedido ${orderNumber}) mas o pagamento não foi concluído.\n\nPosso te ajudar a finalizar sua compra?`
-  );
-  return `mailto:${email}?subject=${subject}&body=${body}`;
-}
 
 export default function AdminOrdersPage() {
   const [items, setItems] = useState<OrderRow[] | null>(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [emailSentId, setEmailSentId] = useState<string | null>(null);
+  const [emailErrorId, setEmailErrorId] = useState<string | null>(null);
   const statusFilterRef = useRef(statusFilter);
   statusFilterRef.current = statusFilter;
 
@@ -98,6 +92,22 @@ export default function AdminOrdersPage() {
     const interval = setInterval(load, 5000);
     return () => clearInterval(interval);
   }, [load]);
+
+  async function handleRecoverEmail(id: string) {
+    setBusyId(id);
+    setEmailErrorId(null);
+    try {
+      const res = await fetch(`/api/admin/orders/${id}/recover-email`, { method: "POST" });
+      if (!res.ok) throw new Error();
+      setEmailSentId(id);
+      setTimeout(() => setEmailSentId((cur) => (cur === id ? null : cur)), 4000);
+    } catch {
+      setEmailErrorId(id);
+      setTimeout(() => setEmailErrorId((cur) => (cur === id ? null : cur)), 4000);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   async function handleDelete(id: string, orderNumber: string) {
     if (!confirm(`Excluir o pedido ${orderNumber}? Essa ação não pode ser desfeita.`)) return;
@@ -149,7 +159,6 @@ export default function AdminOrdersPage() {
             )}
             {items?.map((o) => {
               const wa = whatsappHref(o.customerPhone, o.product.name, o.orderNumber);
-              const mail = emailHref(o.customerEmail, o.product.name, o.orderNumber);
               return (
                 <tr key={o.id} className="border-b border-border align-top transition-colors duration-150 last:border-0 hover:bg-black/[0.02]">
                   <td className="px-4 py-3 font-mono text-xs text-foreground/70">{o.orderNumber}</td>
@@ -172,8 +181,8 @@ export default function AdminOrdersPage() {
                   <td className="px-4 py-3 font-medium">{formatCentsBRL(o.totalCents)}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={o.status} />
-                    {o.status === "PENDING" && (wa || mail) && (
-                      <div className="mt-2 flex gap-2">
+                    {o.status === "PENDING" && (wa || o.customerEmail) && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
                         {wa && (
                           <a
                             href={wa}
@@ -184,14 +193,18 @@ export default function AdminOrdersPage() {
                             Recuperar via WhatsApp
                           </a>
                         )}
-                        {mail && (
-                          <a
-                            href={mail}
-                            className="rounded border border-border px-2 py-1 text-[10px] font-semibold text-foreground/70 transition-colors hover:border-brand"
+                        {o.customerEmail && (
+                          <button
+                            type="button"
+                            disabled={busyId === o.id}
+                            onClick={() => handleRecoverEmail(o.id)}
+                            className="rounded border border-border px-2 py-1 text-[10px] font-semibold text-foreground/70 transition-colors hover:border-brand disabled:opacity-50"
                           >
-                            Recuperar via e-mail
-                          </a>
+                            {busyId === o.id ? "Enviando..." : "Enviar e-mail de recuperação"}
+                          </button>
                         )}
+                        {emailSentId === o.id && <span className="text-[10px] font-medium text-success">E-mail enviado!</span>}
+                        {emailErrorId === o.id && <span className="text-[10px] font-medium text-price">Falha ao enviar</span>}
                       </div>
                     )}
                   </td>
