@@ -16,5 +16,5 @@ export function orderNumber(): string {
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `PED-${y}${m}${d}-${rand}`;
+  return `SHOP-${y}${m}${d}-${rand}`;
 }
