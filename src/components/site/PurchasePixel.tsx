@@ -10,17 +10,19 @@ declare global {
 
 type Order = { orderNumber: string; totalCents: number };
 
-// Fires the Meta Pixel "Purchase" event on /obrigado, once per page load.
+// Fires the Meta Pixel "Purchase" event on /obrigado, once per page load — only when a
+// real, correlated Order was found. Fires fbq('track','Purchase', { value, currency },
+// { eventID }) client-side, then calls POST /api/meta/purchase with the SAME eventId so
+// the Conversions API (server-side) reinforcement can be deduplicated by Meta against
+// this client event.
 //
-// - Real order found: fires fbq('track','Purchase', { value, currency }, { eventID })
-//   client-side, then calls POST /api/meta/purchase with the SAME eventId so the
-//   Conversions API (server-side) reinforcement can be deduplicated by Meta against
-//   this client event.
-// - No order found (the more likely scenario given bravopay.club's checkout pages
-//   don't support passing our orderNumber back — see README): fires Purchase with no
-//   `value` (we have no real amount to report) — still lets ad platforms count the
-//   conversion — but never calls the CAPI route, since there's no real Order to
-//   report server-side.
+// Deliberately never fires a valueless/uncorrelated Purchase when no order is found.
+// That used to be the common case back when checkout was hosted externally
+// (bravopay.club) and couldn't send our orderNumber back — now that checkout is ours,
+// /obrigado always gets a real ?pedido=, so a missing order means someone navigated
+// here directly (bookmark, back button, bot), not a real purchase. Reporting those
+// events with no `value` was exactly what showed up as Meta's own "33% of Purchase
+// events missing value" data-quality warning in Events Manager.
 export function PurchasePixel({
   pixelConfigured,
   order,
@@ -31,7 +33,7 @@ export function PurchasePixel({
   const firedRef = useRef(false);
 
   useEffect(() => {
-    if (!pixelConfigured || firedRef.current) return;
+    if (!pixelConfigured || !order || firedRef.current) return;
     firedRef.current = true;
 
     // fbq is injected by the base Pixel script in the root layout (afterInteractive)
@@ -42,28 +44,20 @@ export function PurchasePixel({
 
       const eventId = crypto.randomUUID();
 
-      if (order) {
-        window.fbq(
-          "track",
-          "Purchase",
-          { value: order.totalCents / 100, currency: "BRL" },
-          { eventID: eventId }
-        );
+      window.fbq(
+        "track",
+        "Purchase",
+        { value: order.totalCents / 100, currency: "BRL" },
+        { eventID: eventId }
+      );
 
-        fetch("/api/meta/purchase", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ eventId, orderNumber: order.orderNumber }),
-        }).catch(() => {
-          // Best-effort telemetry — never surfaced to the user.
-        });
-      } else {
-        // No correlated order — still count the conversion, but don't invent a
-        // value/currency-less amount. currency is included because Meta expects it
-        // whenever `value` would normally be present; omitting `value` here is
-        // deliberate, not an oversight.
-        window.fbq("track", "Purchase", { currency: "BRL" }, { eventID: eventId });
-      }
+      fetch("/api/meta/purchase", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, orderNumber: order.orderNumber }),
+      }).catch(() => {
+        // Best-effort telemetry — never surfaced to the user.
+      });
     };
 
     if (typeof window.fbq === "function") {
