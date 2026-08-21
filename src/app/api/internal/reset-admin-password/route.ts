@@ -4,6 +4,15 @@ import { db } from "@/lib/db";
 
 // Temporary one-off endpoint to reset the admin password, protected by the same
 // shared secret used for other internal maintenance endpoints. Deleted right after use.
+export async function GET(req: NextRequest) {
+  const secret = req.headers.get("x-migrate-secret");
+  if (!secret || secret !== process.env.CHECKOUT_WEBHOOK_SECRET) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+  const admins = await db.admin.findMany({ select: { email: true } });
+  return NextResponse.json({ admins });
+}
+
 export async function POST(req: NextRequest) {
   const secret = req.headers.get("x-migrate-secret");
   if (!secret || secret !== process.env.CHECKOUT_WEBHOOK_SECRET) {
