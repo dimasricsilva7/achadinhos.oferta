@@ -289,7 +289,7 @@ export default async function ObrigadoPage({
       <PurchasePixel
         pixelConfigured={Boolean(settings.metaPixelId)}
         order={
-          order
+          order && order.status === "PAID"
             ? { orderNumber: order.orderNumber, totalCents: order.totalCents }
             : null
         }

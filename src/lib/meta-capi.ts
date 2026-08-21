@@ -10,7 +10,7 @@
 const GRAPH_API_VERSION = "v21.0";
 
 type SendEventInput = {
-  eventName: "Purchase" | "AddToCart";
+  eventName: "Purchase" | "AddToCart" | "ViewContent";
   eventId: string;
   pixelId: string;
   eventSourceUrl: string;
@@ -93,6 +93,33 @@ export async function sendPurchaseEvent(input: SendPurchaseEventInput): Promise<
     clientIp: input.clientIp,
     clientUserAgent: input.clientUserAgent,
     customData: { currency: "BRL", value: input.valueCents / 100, order_id: input.orderNumber },
+  });
+}
+
+type SendViewContentEventInput = {
+  eventId: string;
+  pixelId: string;
+  valueCents: number;
+  productId: string;
+  eventSourceUrl: string;
+  clientIp?: string | null;
+  clientUserAgent?: string | null;
+};
+
+export async function sendViewContentEvent(input: SendViewContentEventInput): Promise<{ ok: boolean }> {
+  return sendEvent({
+    eventName: "ViewContent",
+    eventId: input.eventId,
+    pixelId: input.pixelId,
+    eventSourceUrl: input.eventSourceUrl,
+    clientIp: input.clientIp,
+    clientUserAgent: input.clientUserAgent,
+    customData: {
+      currency: "BRL",
+      value: input.valueCents / 100,
+      content_ids: [input.productId],
+      content_type: "product",
+    },
   });
 }
 

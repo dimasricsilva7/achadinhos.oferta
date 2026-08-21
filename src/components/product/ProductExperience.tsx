@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ProductDTO } from "@/lib/product-dto";
 import { ProductHeader } from "@/components/product/ProductHeader";
 import { ProductGallery } from "@/components/product/ProductGallery";
@@ -77,6 +77,49 @@ export function ProductExperience({
   function toggleAddon(id: string) {
     setSelectedAddonIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
+
+  const viewContentFiredRef = useRef(false);
+
+  useEffect(() => {
+    if (viewContentFiredRef.current) return;
+    viewContentFiredRef.current = true;
+
+    const fire = () => {
+      if (typeof window.fbq !== "function") return;
+      const eventId = crypto.randomUUID();
+      window.fbq(
+        "track",
+        "ViewContent",
+        { value: effectivePriceCents / 100, currency: "BRL", content_ids: [product.id], content_type: "product", content_name: product.name },
+        { eventID: eventId }
+      );
+      fetch("/api/meta/view-content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ eventId, productId: product.id, valueCents: effectivePriceCents }),
+      }).catch(() => {});
+    };
+
+    if (typeof window.fbq === "function") {
+      fire();
+    } else {
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts += 1;
+        if (typeof window.fbq === "function") {
+          clearInterval(interval);
+          fire();
+        } else if (attempts > 20) {
+          clearInterval(interval);
+        }
+      }, 150);
+      return () => clearInterval(interval);
+    }
+    // Fires once on the initial mount, with whatever variant is selected by default —
+    // switching variants afterward doesn't re-fire (matches how Meta expects ViewContent:
+    // once per product page visit, not once per variant toggle).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function fireAddToCart() {
     if (typeof window === "undefined" || typeof window.fbq !== "function") return;

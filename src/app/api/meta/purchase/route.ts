@@ -26,6 +26,11 @@ export async function POST(req: NextRequest) {
   if (!order) {
     return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
   }
+  if (order.status !== "PAID") {
+    // Never report a conversion for money that hasn't actually landed — inflates
+    // Meta's data and throws off ROAS-based optimization.
+    return NextResponse.json({ error: "Pedido ainda não pago" }, { status: 409 });
+  }
 
   // Idempotent: a reload of /obrigado (or a retried fetch) never double-sends the
   // server-side event for the same order.
