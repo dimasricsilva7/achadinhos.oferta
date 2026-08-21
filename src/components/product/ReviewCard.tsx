@@ -31,6 +31,7 @@ export function ReviewCard({ review }: { review: ReviewDTO }) {
         <FallbackImg
           src={review.avatarUrl}
           alt=""
+          loading="lazy"
           className="h-9 w-9 flex-shrink-0 rounded-full object-cover"
           placeholder={
             <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-brand/10 text-xs font-semibold text-brand">
@@ -67,6 +68,7 @@ export function ReviewCard({ review }: { review: ReviewDTO }) {
               <FallbackImg
                 src={m.type === "video" ? m.thumbnailUrl : m.thumbnailUrl || m.url}
                 alt=""
+                loading="lazy"
                 className="h-full w-full object-cover"
                 placeholder={null}
               />

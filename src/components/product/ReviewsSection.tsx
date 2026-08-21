@@ -35,9 +35,15 @@ export function ReviewsSection({
   reviewHighlights: ReviewHighlightDTO[];
 }) {
   const [query, setQuery] = useState("");
+  const PAGE_SIZE = 5;
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
+  // Capped, not the full list: with dozens of reviews this strip is purely a visual
+  // preview, and rendering every single media item up front (loaded eagerly, before
+  // the shopper even scrolls this far) was competing with the actual product image
+  // for bandwidth on first load — a real contributor to slow LCP/page-speed on mobile.
   const allMedia = useMemo(
-    () => reviews.flatMap((r) => r.media.map((m) => ({ ...m, reviewId: r.id }))),
+    () => reviews.flatMap((r) => r.media.map((m) => ({ ...m, reviewId: r.id }))).slice(0, 12),
     [reviews]
   );
 
@@ -46,6 +52,9 @@ export function ReviewsSection({
     if (!q) return reviews;
     return reviews.filter((r) => r.comment.toLowerCase().includes(q));
   }, [reviews, query]);
+
+  const visibleReviews = filteredReviews.slice(0, visibleCount);
+  const hasMore = visibleCount < filteredReviews.length;
 
   if (reviews.length === 0 && reviewHighlights.length === 0) return null;
 
@@ -76,7 +85,7 @@ export function ReviewsSection({
               key={m.id}
               className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-lg border border-border bg-neutral-100"
             >
-              <FallbackImg src={m.thumbnailUrl || m.url} alt="" className="h-full w-full object-cover" placeholder={null} />
+              <FallbackImg src={m.thumbnailUrl || m.url} alt="" loading="lazy" className="h-full w-full object-cover" placeholder={null} />
               {m.type === "video" && (
                 <span className="absolute inset-0 flex items-center justify-center bg-black/25">
                   <PlayIcon />
@@ -105,10 +114,20 @@ export function ReviewsSection({
         <p className="py-6 text-center text-sm text-foreground/45">Nenhuma avaliação encontrada.</p>
       ) : (
         <div className="flex flex-col">
-          {filteredReviews.map((r) => (
+          {visibleReviews.map((r) => (
             <ReviewCard key={r.id} review={r} />
           ))}
         </div>
+      )}
+
+      {hasMore && (
+        <button
+          type="button"
+          onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+          className="w-full rounded-lg border border-border py-2.5 text-sm font-medium text-foreground/70 hover:border-brand hover:text-brand"
+        >
+          Ver mais avaliações ({filteredReviews.length - visibleCount})
+        </button>
       )}
     </div>
   );
