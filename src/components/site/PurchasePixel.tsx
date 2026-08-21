@@ -36,32 +36,33 @@ export function PurchasePixel({
     if (!pixelConfigured || !order || firedRef.current) return;
     firedRef.current = true;
 
-    // fbq is injected by the base Pixel script in the root layout (afterInteractive)
-    // — by the time this effect runs the script should already be loaded, but guard
-    // anyway in case it hasn't attached yet.
-    const fire = () => {
+    // Server CAPI report fires immediately and unconditionally — this is also just a
+    // reinforcement of checkout-bravopay's own direct server-to-server Purchase report
+    // (fired the instant payment is confirmed, before the customer even reaches this
+    // page — see checkout-bravopay/src/routes/checkout.js), so it's idempotent either
+    // way (Order.metaPurchaseEventSentAt). The client fbq call below is best-effort on
+    // top of that, with a short poll for late-attaching fbq — never blocks the CAPI call.
+    const eventId = crypto.randomUUID();
+    fetch("/api/meta/purchase", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId, orderNumber: order.orderNumber }),
+    }).catch(() => {
+      // Best-effort telemetry — never surfaced to the user.
+    });
+
+    const fireClientPixel = () => {
       if (typeof window.fbq !== "function") return;
-
-      const eventId = crypto.randomUUID();
-
       window.fbq(
         "track",
         "Purchase",
         { value: order.totalCents / 100, currency: "BRL" },
         { eventID: eventId }
       );
-
-      fetch("/api/meta/purchase", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, orderNumber: order.orderNumber }),
-      }).catch(() => {
-        // Best-effort telemetry — never surfaced to the user.
-      });
     };
 
     if (typeof window.fbq === "function") {
-      fire();
+      fireClientPixel();
     } else {
       // Base pixel script uses next/script strategy="afterInteractive" — it may not
       // have attached fbq yet on first paint. Poll briefly instead of missing the
@@ -71,7 +72,7 @@ export function PurchasePixel({
         attempts += 1;
         if (typeof window.fbq === "function") {
           clearInterval(interval);
-          fire();
+          fireClientPixel();
         } else if (attempts > 20) {
           clearInterval(interval);
         }

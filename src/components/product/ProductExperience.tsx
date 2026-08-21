@@ -84,31 +84,36 @@ export function ProductExperience({
     if (viewContentFiredRef.current) return;
     viewContentFiredRef.current = true;
 
-    const fire = () => {
+    // Server CAPI report fires immediately and unconditionally — never waits on (or
+    // depends on) the client Pixel script, which can still be loading on slow
+    // connections. The client fbq call below is best-effort on top of that, with a
+    // short poll for late-attaching fbq.
+    const eventId = crypto.randomUUID();
+    fetch("/api/meta/view-content", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId, productId: product.id, valueCents: effectivePriceCents }),
+    }).catch(() => {});
+
+    const fireClientPixel = () => {
       if (typeof window.fbq !== "function") return;
-      const eventId = crypto.randomUUID();
       window.fbq(
         "track",
         "ViewContent",
         { value: effectivePriceCents / 100, currency: "BRL", content_ids: [product.id], content_type: "product", content_name: product.name },
         { eventID: eventId }
       );
-      fetch("/api/meta/view-content", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId, productId: product.id, valueCents: effectivePriceCents }),
-      }).catch(() => {});
     };
 
     if (typeof window.fbq === "function") {
-      fire();
+      fireClientPixel();
     } else {
       let attempts = 0;
       const interval = setInterval(() => {
         attempts += 1;
         if (typeof window.fbq === "function") {
           clearInterval(interval);
-          fire();
+          fireClientPixel();
         } else if (attempts > 20) {
           clearInterval(interval);
         }
@@ -121,18 +126,24 @@ export function ProductExperience({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // The server-side CAPI report never depends on the client Pixel script having
+  // finished loading — a customer can click "Comprar" the instant the page paints,
+  // well before fbq attaches (worse on slow mobile connections, exactly the traffic
+  // ad clicks bring). The old version bailed out entirely when fbq wasn't ready yet,
+  // silently dropping the event — the real cause behind AddToCart showing 0 in Ads
+  // Manager. The client fbq call stays best-effort/optional on top of that.
   function fireAddToCart() {
-    if (typeof window === "undefined" || typeof window.fbq !== "function") return;
-
     const valueCents = (effectivePriceCents + addonsCents) * quantity;
     const eventId = crypto.randomUUID();
 
-    window.fbq(
-      "track",
-      "AddToCart",
-      { value: valueCents / 100, currency: "BRL", content_ids: [product.id], content_type: "product" },
-      { eventID: eventId }
-    );
+    if (typeof window !== "undefined" && typeof window.fbq === "function") {
+      window.fbq(
+        "track",
+        "AddToCart",
+        { value: valueCents / 100, currency: "BRL", content_ids: [product.id], content_type: "product" },
+        { eventID: eventId }
+      );
+    }
 
     fetch("/api/meta/add-to-cart", {
       method: "POST",
