@@ -4,7 +4,7 @@ import { useState } from "react";
 import type { FooterLink } from "@/lib/settings-service";
 import { FallbackImg } from "@/components/ui/FallbackMedia";
 
-const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout", "Marketing", "Loja"] as const;
+const TABS = ["Identidade", "Cores", "Header/Footer", "Checkout", "Marketing", "Loja", "Conta"] as const;
 
 export type SettingsFormInitial = {
   siteName: string;
@@ -186,22 +186,35 @@ export function SettingsForm({
     setSaveState("success");
   }
 
+  const tabsBar = (
+    <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
+      {TABS.map((t) => (
+        <button
+          key={t}
+          type="button"
+          onClick={() => setTab(t)}
+          className={`rounded-t-lg px-3 py-2 text-sm ${
+            tab === t ? "border-b-2 border-brand font-medium text-brand" : "text-foreground/60 hover:text-foreground"
+          }`}
+        >
+          {t}
+        </button>
+      ))}
+    </div>
+  );
+
+  if (tab === "Conta") {
+    return (
+      <div className="max-w-3xl">
+        {tabsBar}
+        <ChangePasswordCard />
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl">
-      <div className="mb-4 flex flex-wrap gap-1 border-b border-border">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setTab(t)}
-            className={`rounded-t-lg px-3 py-2 text-sm ${
-              tab === t ? "border-b-2 border-brand font-medium text-brand" : "text-foreground/60 hover:text-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
+      {tabsBar}
 
       {saveState === "error" && error && (
         <p className="mb-4 rounded-lg bg-price/10 px-3 py-2 text-sm text-price">{error}</p>
@@ -483,6 +496,100 @@ export function SettingsForm({
           border-color: var(--brand);
         }
       `}</style>
+    </form>
+  );
+}
+
+function ChangePasswordCard() {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [state, setState] = useState<SaveState>("idle");
+  const [msg, setMsg] = useState<string | null>(null);
+
+  async function handleChangePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setMsg(null);
+
+    if (newPassword.length < 8) {
+      setState("error");
+      setMsg("A nova senha deve ter pelo menos 8 caracteres.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setState("error");
+      setMsg("As senhas não coincidem.");
+      return;
+    }
+
+    setState("saving");
+    const res = await fetch("/api/admin/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      setState("error");
+      setMsg(data.error ?? "Não foi possível trocar a senha.");
+      return;
+    }
+
+    setState("success");
+    setMsg("Senha alterada com sucesso.");
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  }
+
+  return (
+    <form onSubmit={handleChangePassword} className="flex max-w-sm flex-col gap-4">
+      {msg && (
+        <p
+          className={`rounded-lg px-3 py-2 text-sm ${
+            state === "success" ? "bg-success/10 text-success" : "bg-price/10 text-price"
+          }`}
+        >
+          {msg}
+        </p>
+      )}
+      <Field label="Senha atual">
+        <input
+          type="password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          required
+          className="input"
+        />
+      </Field>
+      <Field label="Nova senha (mín. 8 caracteres)">
+        <input
+          type="password"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          required
+          minLength={8}
+          className="input"
+        />
+      </Field>
+      <Field label="Confirmar nova senha">
+        <input
+          type="password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          minLength={8}
+          className="input"
+        />
+      </Field>
+      <button
+        type="submit"
+        disabled={state === "saving"}
+        className="w-fit rounded-lg bg-brand px-5 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+      >
+        {state === "saving" ? "Trocando…" : "Trocar senha"}
+      </button>
     </form>
   );
 }
