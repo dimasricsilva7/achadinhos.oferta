@@ -66,8 +66,12 @@ export async function GET(req: NextRequest) {
   const [totalOrders, engagedOrders, byStatus, revenueAgg, paidRevenueAgg] = await Promise.all([
     db.order.count({ where }),
     db.order.count({ where: engagedWhere }),
-    db.order.groupBy({ by: ["status"], where, _count: { _all: true } }),
-    db.order.aggregate({ where, _sum: { totalCents: true }, _avg: { totalCents: true } }),
+    // Status breakdown only over real (engaged) orders — a click that never got a name
+    // is still technically "PENDING" in the DB, but it doesn't belong in this dashboard.
+    db.order.groupBy({ by: ["status"], where: engagedWhere, _count: { _all: true } }),
+    // Faturamento total: only real orders count toward this — a click-only row's
+    // theoretical price was never actually offered to a paying customer at checkout.
+    db.order.aggregate({ where: engagedWhere, _sum: { totalCents: true }, _avg: { totalCents: true } }),
     db.order.aggregate({ where: paidWhere, _sum: { totalCents: true }, _avg: { totalCents: true } }),
   ]);
 

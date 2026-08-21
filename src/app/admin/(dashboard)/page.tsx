@@ -134,20 +134,9 @@ export default function AdminDashboardPage() {
             </p>
           </div>
 
-          {/* Separado de propósito: cada clique em "Comprar" já cria um registro antes
-              do cliente ver a tela de pagamento — a maioria fecha a aba, é bot de
-              preview de link, ou desiste do frete. Isso não é "pedido gerado" de
-              verdade, então não entra nas métricas acima nem na conversão. */}
-          <div className="mt-3 rounded-2xl border border-dashed border-border bg-background p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-foreground/40">
-              Cliques em &quot;Comprar&quot; sem preencher o checkout
-            </p>
-            <p className="mt-1 text-xl font-bold text-foreground/50">{data.clickOnlyOrders}</p>
-            <p className="mt-1 text-xs text-foreground/40">
-              Gente que clicou e não chegou a preencher nome/e-mail no checkout — fechou a aba, desistiu do frete, ou é
-              bot de preview de link. Não conta como pedido nem afeta a conversão acima.
-            </p>
-          </div>
+          {/* Cliques que nunca preencheram o checkout ficam só na aba "Cliques em
+              Comprar" (admin/clicks) — de propósito fora do dashboard, que agora só
+              mostra pedidos reais e pagos. */}
         </>
       )}
 
