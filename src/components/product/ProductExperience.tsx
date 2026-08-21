@@ -21,6 +21,12 @@ import { StoreInfo } from "@/components/product/StoreInfo";
 import { discountPercent } from "@/lib/money";
 import type { RelatedProductDTO, StoreInfoDTO } from "@/lib/product-dto";
 
+declare global {
+  interface Window {
+    fbq?: (...args: unknown[]) => void;
+  }
+}
+
 export function ProductExperience({
   product,
   store,
@@ -72,9 +78,32 @@ export function ProductExperience({
     setSelectedAddonIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
+  function fireAddToCart() {
+    if (typeof window === "undefined" || typeof window.fbq !== "function") return;
+
+    const valueCents = (effectivePriceCents + addonsCents) * quantity;
+    const eventId = crypto.randomUUID();
+
+    window.fbq(
+      "track",
+      "AddToCart",
+      { value: valueCents / 100, currency: "BRL", content_ids: [product.id], content_type: "product" },
+      { eventID: eventId }
+    );
+
+    fetch("/api/meta/add-to-cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId, productId: product.id, valueCents }),
+    }).catch(() => {
+      // Best-effort telemetry — never surfaced to the user.
+    });
+  }
+
   async function handleBuy() {
     setErrorMessage(null);
     setBuyState("loading");
+    fireAddToCart();
     try {
       const res = await fetch("/api/checkout/start", {
         method: "POST",
