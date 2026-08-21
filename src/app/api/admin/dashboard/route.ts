@@ -54,9 +54,18 @@ export async function GET(req: NextRequest) {
 
   const where = { createdAt: { gte: from, lte: to } };
   const paidWhere = { ...where, status: "PAID" };
+  // "Comprar" creates an Order the instant it's clicked — before the customer has
+  // seen the checkout form, let alone filled it (see /api/checkout/start). That means
+  // a raw Order count is dominated by clicks that never went anywhere: closed tabs,
+  // link-preview bots, second thoughts on the shipping fee. customerName is only ever
+  // set once the customer actually submits the checkout form (via checkout-bravopay's
+  // capture-customer callback) or pays — so it's the real signal of "someone engaged
+  // with checkout", as opposed to "someone's ad click created a database row".
+  const engagedWhere = { ...where, customerName: { not: null } };
 
-  const [totalOrders, byStatus, revenueAgg, paidRevenueAgg] = await Promise.all([
+  const [totalOrders, engagedOrders, byStatus, revenueAgg, paidRevenueAgg] = await Promise.all([
     db.order.count({ where }),
+    db.order.count({ where: engagedWhere }),
     db.order.groupBy({ by: ["status"], where, _count: { _all: true } }),
     db.order.aggregate({ where, _sum: { totalCents: true }, _avg: { totalCents: true } }),
     db.order.aggregate({ where: paidWhere, _sum: { totalCents: true }, _avg: { totalCents: true } }),
@@ -69,6 +78,8 @@ export async function GET(req: NextRequest) {
     from: from.toISOString(),
     to: to.toISOString(),
     totalOrders,
+    engagedOrders,
+    clickOnlyOrders: totalOrders - engagedOrders,
     statusCounts,
     grossRevenueCents: revenueAgg._sum.totalCents ?? 0,
     averageTicketCents: Math.round(revenueAgg._avg.totalCents ?? 0),

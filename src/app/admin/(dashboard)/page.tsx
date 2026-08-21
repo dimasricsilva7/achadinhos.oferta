@@ -5,6 +5,8 @@ import { formatCentsBRL } from "@/lib/money";
 
 type DashboardData = {
   totalOrders: number;
+  engagedOrders: number;
+  clickOnlyOrders: number;
   statusCounts: Record<string, number>;
   grossRevenueCents: number;
   averageTicketCents: number;
@@ -60,9 +62,13 @@ export default function AdminDashboardPage() {
     };
   }, [load]);
 
-  const pendingCount = data?.statusCounts.PENDING ?? 0;
   const paidCount = data?.statusCounts.PAID ?? 0;
-  const conversionPercent = data && data.totalOrders > 0 ? (paidCount / data.totalOrders) * 100 : 0;
+  const engagedOrders = data?.engagedOrders ?? 0;
+  const engagedPendingCount = Math.max(engagedOrders - paidCount, 0);
+  // Conversion is measured against people who actually engaged with the checkout
+  // form (engagedOrders) — not the raw Order count, which includes every "Comprar"
+  // click that never went anywhere (see the dashboard API route's comment).
+  const conversionPercent = data && engagedOrders > 0 ? (paidCount / engagedOrders) * 100 : 0;
 
   return (
     <div>
@@ -111,8 +117,8 @@ export default function AdminDashboardPage() {
 
           <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
             <MetricCard label="Ticket médio (pago)" value={formatCentsBRL(data.paidAverageTicketCents)} />
-            <MetricCard label="Pedidos" value={String(data.totalOrders)} />
-            <MetricCard label="Pendentes" value={String(pendingCount)} tone="pending" />
+            <MetricCard label="Pedidos reais" value={String(engagedOrders)} />
+            <MetricCard label="Pendentes (reais)" value={String(engagedPendingCount)} tone="pending" />
             <MetricCard label="Pagos" value={String(paidCount)} tone="paid" />
           </div>
 
@@ -123,15 +129,32 @@ export default function AdminDashboardPage() {
             </div>
             <Sparkline percent={conversionPercent} />
             <p className="mt-2 text-xs text-foreground/45">
-              {paidCount} pago{paidCount === 1 ? "" : "s"} de {data.totalOrders} pedido{data.totalOrders === 1 ? "" : "s"} no período
+              {paidCount} pago{paidCount === 1 ? "" : "s"} de {engagedOrders} pedido{engagedOrders === 1 ? "" : "s"} real
+              {engagedOrders === 1 ? "" : "is"} no período (quem preencheu o checkout)
+            </p>
+          </div>
+
+          {/* Separado de propósito: cada clique em "Comprar" já cria um registro antes
+              do cliente ver a tela de pagamento — a maioria fecha a aba, é bot de
+              preview de link, ou desiste do frete. Isso não é "pedido gerado" de
+              verdade, então não entra nas métricas acima nem na conversão. */}
+          <div className="mt-3 rounded-2xl border border-dashed border-border bg-background p-4">
+            <p className="text-xs font-medium uppercase tracking-wide text-foreground/40">
+              Cliques em &quot;Comprar&quot; sem preencher o checkout
+            </p>
+            <p className="mt-1 text-xl font-bold text-foreground/50">{data.clickOnlyOrders}</p>
+            <p className="mt-1 text-xs text-foreground/40">
+              Gente que clicou e não chegou a preencher nome/e-mail no checkout — fechou a aba, desistiu do frete, ou é
+              bot de preview de link. Não conta como pedido nem afeta a conversão acima.
             </p>
           </div>
         </>
       )}
 
       <p className="mt-6 text-xs text-foreground/40">
-        Números calculados a partir dos pedidos registrados no sistema. O status &quot;Pago&quot; é confirmado
-        automaticamente pelo checkout assim que o Pix é aprovado na BravoPay.
+        Números calculados a partir dos pedidos registrados no sistema. &quot;Pedidos reais&quot; conta só quem
+        preencheu o checkout. O status &quot;Pago&quot; é confirmado automaticamente assim que o Pix é aprovado na
+        BravoPay.
       </p>
     </div>
   );
