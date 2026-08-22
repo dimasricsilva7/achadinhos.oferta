@@ -86,7 +86,7 @@ export function StickyBuyBar({
               <span className="text-sm font-semibold">{disabledReason ?? "Indisponível"}</span>
             ) : (
               <>
-                <span className="text-xs font-medium">Compre com cupons</span>
+                <span className="text-xs font-medium">Compre agora</span>
                 <span className="text-base font-bold">{formatCentsBRL(totalCents)}</span>
               </>
             )}

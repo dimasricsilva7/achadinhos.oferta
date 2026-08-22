@@ -5,6 +5,7 @@ import type { ProductDTO } from "@/lib/product-dto";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { AddonSelector } from "@/components/product/AddonSelector";
+import { ShippingInfo } from "@/components/product/ShippingInfo";
 import { formatCentsBRL } from "@/lib/money";
 import { FallbackImg } from "@/components/ui/FallbackMedia";
 
@@ -113,6 +114,7 @@ export function PurchaseSheet({
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <div className="flex flex-col gap-5">
+            <ShippingInfo shipping={product.shipping} />
             <VariantSelector variants={product.variants} selectedId={selectedVariantId} onSelect={onSelectVariant} />
             <QuantitySelector quantity={quantity} max={Math.max(0, stock)} onChange={onQuantityChange} />
             <AddonSelector addons={product.addons} selectedIds={selectedAddonIds} onToggle={onToggleAddon} />
