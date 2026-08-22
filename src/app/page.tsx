@@ -5,6 +5,11 @@ import { getSettings } from "@/lib/settings-service";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { FallbackImg } from "@/components/ui/FallbackMedia";
 
+// Same fix as /produto/[slug]: without this, Next statically caches the homepage at
+// build/deploy time, so a price/stock edit or a newly-activated product never shows up
+// until the next deploy.
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const [products, settings] = await Promise.all([
     db.product.findMany({

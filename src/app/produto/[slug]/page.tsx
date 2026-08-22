@@ -7,6 +7,12 @@ import { getSettings } from "@/lib/settings-service";
 import { getMostRecentAdminLoginAt } from "@/lib/auth";
 import { formatActiveAgoLabel } from "@/lib/time-ago";
 
+// Without this, Next statically caches this page at build/deploy time — a price or
+// stock edit in the admin never shows up on the storefront until the next deploy,
+// which is exactly the bug this fixes (admin showed a new price, the live page kept
+// serving the old one).
+export const dynamic = "force-dynamic";
+
 type Params = { params: Promise<{ slug: string }> };
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
