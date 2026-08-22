@@ -5,7 +5,7 @@ import type { ProductDTO } from "@/lib/product-dto";
 import { VariantSelector } from "@/components/product/VariantSelector";
 import { QuantitySelector } from "@/components/product/QuantitySelector";
 import { AddonSelector } from "@/components/product/AddonSelector";
-import { ShippingInfo } from "@/components/product/ShippingInfo";
+import type { ShippingInfoDTO } from "@/lib/product-dto";
 import { formatCentsBRL } from "@/lib/money";
 import { FallbackImg } from "@/components/ui/FallbackMedia";
 
@@ -16,6 +16,73 @@ function CloseIcon() {
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M18 6L6 18M6 6l12 12" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+
+function TruckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="flex-shrink-0 text-foreground/60">
+      <path d="M1 4h13v11H1z" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 8h4l4 4v3h-8V8Z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="6" cy="17.5" r="1.8" />
+      <circle cx="17.5" cy="17.5" r="1.8" />
+    </svg>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="flex-shrink-0">
+      <path d="M20 6 9 17l-5-5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+const MONTHS_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+// Estimated delivery WINDOW = access date + 2 to + 3 calendar days, recomputed on
+// every page load from the visitor's own clock (never a fixed admin-authored date,
+// which would go stale for ad traffic visiting days after it was typed). Purely a
+// presentational estimate — no real carrier/freight calculation exists in this
+// project; never used for price or checkout logic.
+function deliveryRangeLabel(): string {
+  const start = new Date();
+  start.setDate(start.getDate() + 2);
+  const end = new Date();
+  end.setDate(end.getDate() + 3);
+
+  const sameMonth = start.getMonth() === end.getMonth();
+  const startLabel = sameMonth ? String(start.getDate()) : `${start.getDate()}/${MONTHS_PT[start.getMonth()]}`;
+  const endLabel = `${end.getDate()}/${MONTHS_PT[end.getMonth()]}`;
+  return `Chega entre ${startLabel} e ${endLabel}`;
+}
+
+// Matches the reference marketplace app's shipping-option block inside the purchase
+// sheet: shipping method name, delivery window, and — only when the admin has set
+// this product's shipping to R$0,00 (shipping.finalPriceCents === 0) — a green
+// "Cupom de Frete Aplicado" confirmation. Never a manual toggle; it's automatic
+// exactly like the same free-shipping detection already used on the main product page.
+function PurchaseSheetShipping({ shipping }: { shipping: ShippingInfoDTO }) {
+  if (!shipping.enabled) return null;
+
+  const couponApplied = shipping.free || shipping.finalPriceCents === 0;
+
+  return (
+    <div className="rounded-lg border border-border px-3 py-2.5">
+      <p className="text-sm text-foreground/60">
+        Opção de envio: <span className="font-medium text-foreground">Entrega Padrão</span>
+      </p>
+      <div className="mt-1.5 flex items-center gap-1.5 text-sm text-foreground/80">
+        <TruckIcon />
+        {deliveryRangeLabel()}
+      </div>
+      {couponApplied && (
+        <div className="mt-1.5 flex items-center gap-1.5 text-sm font-medium text-success">
+          <CheckIcon />
+          Cupom de Frete Aplicado
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -114,7 +181,7 @@ export function PurchaseSheet({
 
         <div className="flex-1 overflow-y-auto px-4 py-4">
           <div className="flex flex-col gap-5">
-            <ShippingInfo shipping={product.shipping} />
+            <PurchaseSheetShipping shipping={product.shipping} />
             <VariantSelector variants={product.variants} selectedId={selectedVariantId} onSelect={onSelectVariant} />
             <QuantitySelector quantity={quantity} max={Math.max(0, stock)} onChange={onQuantityChange} />
             <AddonSelector addons={product.addons} selectedIds={selectedAddonIds} onToggle={onToggleAddon} />
