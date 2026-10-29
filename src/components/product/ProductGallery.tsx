@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProductImageDTO, ProductVariantDTO } from "@/lib/product-dto";
 import { FallbackImg, FallbackVideo } from "@/components/ui/FallbackMedia";
 
@@ -39,7 +39,29 @@ export function ProductGallery({
   const scrollerRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
 
-  const items = images.length > 0 ? images : [{ id: "placeholder", url: "", alt: "", type: "image", sortOrder: 0, isPrimary: true }];
+  const baseItems: ProductImageDTO[] =
+    images.length > 0 ? images : [{ id: "placeholder", url: "", alt: "", type: "image", sortOrder: 0, isPrimary: true }];
+
+  // Imagem da variação selecionada: quando o admin cadastrou uma imagem própria para
+  // a variação e ela ainda não está na galeria, ela entra como PRIMEIRO item — assim
+  // ao trocar a variação a imagem principal muda de verdade (antes só o selo aparecia).
+  const variantImage: ProductImageDTO | null =
+    activeUrl && !baseItems.some((i) => i.url === activeUrl)
+      ? { id: `variant:${activeUrl}`, url: activeUrl, alt: "", type: "image", sortOrder: -1, isPrimary: false }
+      : null;
+
+  const items: ProductImageDTO[] = variantImage ? [variantImage, ...baseItems] : baseItems;
+
+  // Índice da imagem que representa a variação selecionada (a própria, se já na galeria).
+  const variantIndex = activeUrl ? Math.max(0, items.findIndex((i) => i.url === activeUrl)) : -1;
+
+  // Ao trocar a variação, leva a galeria para a imagem dela. Só rola o scroller aqui
+  // (sem setState) — o onScroll atualiza o indicador naturalmente.
+  useEffect(() => {
+    if (variantIndex < 0) return;
+    const el = scrollerRef.current;
+    if (el) el.scrollTo({ left: variantIndex * el.clientWidth });
+  }, [activeUrl, variantIndex]);
 
   function scrollTo(i: number) {
     const el = scrollerRef.current;
