@@ -128,6 +128,7 @@ function Field({
   autoComplete,
   maxLength,
   className = "",
+  id,
 }: {
   label: string;
   value: string;
@@ -139,11 +140,13 @@ function Field({
   autoComplete?: string;
   maxLength?: number;
   className?: string;
+  id?: string;
 }) {
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
       <span className="text-xs font-medium text-neutral-600">{label}</span>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -168,36 +171,52 @@ export function CheckoutClient(props: CheckoutClientProps) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [topError, setTopError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [cepStatus, setCepStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
   const set = (k: keyof FormState) => (v: string) => setForm((f) => ({ ...f, [k]: v }));
 
-  /* ------- CEP autofill (ViaCEP) ------- */
-  const cepDigits = form.cep.replace(/\D/g, "");
+  /* ------- CEP autofill (ViaCEP) — disparado no onChange, preenche rua/bairro/cidade/UF ------- */
   const lastCep = useRef("");
-  useEffect(() => {
-    if (cepDigits.length !== 8 || cepDigits === lastCep.current) return;
-    lastCep.current = cepDigits;
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch(`https://viacep.com.br/ws/${cepDigits}/json/`, { cache: "no-store" });
-        const data = await res.json();
-        if (cancelled || data.erro) return;
-        setForm((f) => ({
-          ...f,
-          street: f.street || data.logradouro || "",
-          neighborhood: f.neighborhood || data.bairro || "",
-          city: data.localidade || f.city,
-          state: data.uf || f.state,
-        }));
-      } catch {
-        /* silencioso — cliente pode preencher manualmente */
+  const lookupCep = useCallback(async (digits: string) => {
+    lastCep.current = digits;
+    setCepStatus("loading");
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`, { cache: "no-store" });
+      const data = await res.json();
+      if (data?.erro) {
+        setCepStatus("error");
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [cepDigits]);
+      setForm((f) => ({
+        ...f,
+        // Vem do CEP: sobrescreve. Mantém o que o cliente digitou quando o ViaCEP não
+        // conhece o logradouro/bairro (CEPs gerais de cidade).
+        street: data.logradouro || f.street,
+        neighborhood: data.bairro || f.neighborhood,
+        city: data.localidade || f.city,
+        state: data.uf || f.state,
+      }));
+      setCepStatus("done");
+      // Rua/bairro/cidade já vieram prontos — leva o foco direto pro número.
+      requestAnimationFrame(() => document.getElementById("checkout-number")?.focus());
+    } catch {
+      setCepStatus("error");
+    }
+  }, []);
+  const handleCepChange = useCallback(
+    (v: string) => {
+      const masked = maskCEP(v);
+      setForm((f) => ({ ...f, cep: masked }));
+      const digits = masked.replace(/\D/g, "");
+      if (digits.length === 8) {
+        if (digits !== lastCep.current) lookupCep(digits);
+      } else {
+        lastCep.current = "";
+        setCepStatus("idle");
+      }
+    },
+    [lookupCep]
+  );
 
   async function handleSubmit() {
     if (submitting) return;
@@ -261,6 +280,8 @@ export function CheckoutClient(props: CheckoutClientProps) {
           errors={errors}
           topError={topError}
           submitting={submitting}
+          cepStatus={cepStatus}
+          onCepChange={handleCepChange}
           onSubmit={handleSubmit}
         />
       ) : (
@@ -268,6 +289,8 @@ export function CheckoutClient(props: CheckoutClientProps) {
           orderNumber={props.orderNumber}
           amountCents={props.amountCents}
           pix={pix}
+          regenerating={submitting}
+          onRegenerate={handleSubmit}
         />
       )}
     </div>
@@ -289,6 +312,8 @@ function FormView({
   errors,
   topError,
   submitting,
+  cepStatus,
+  onCepChange,
   onSubmit,
 }: CheckoutClientProps & {
   form: FormState;
@@ -296,6 +321,8 @@ function FormView({
   errors: Record<string, string>;
   topError: string | null;
   submitting: boolean;
+  cepStatus: "idle" | "loading" | "done" | "error";
+  onCepChange: (v: string) => void;
   onSubmit: () => void;
 }) {
   return (
@@ -312,8 +339,20 @@ function FormView({
             <Field className="col-span-2" label="E-mail" type="email" inputMode="email" value={form.email} onChange={set("email")} error={errors.email} autoComplete="email" placeholder="voce@email.com" />
             <Field label="Telefone / WhatsApp" inputMode="tel" value={form.phone} onChange={(v) => set("phone")(maskPhone(v))} error={errors.phone} autoComplete="tel" placeholder="(11) 90000-0000" />
             <Field label="CPF" inputMode="numeric" value={form.cpf} onChange={(v) => set("cpf")(maskCPF(v))} error={errors.cpf} placeholder="000.000.000-00" />
-            <Field label="CEP" inputMode="numeric" value={form.cep} onChange={(v) => set("cep")(maskCEP(v))} error={errors.cep} autoComplete="postal-code" placeholder="00000-000" />
-            <Field label="Número" inputMode="numeric" value={form.number} onChange={set("number")} error={errors.number} placeholder="123" />
+            <Field label="CEP" inputMode="numeric" value={form.cep} onChange={onCepChange} error={errors.cep} autoComplete="postal-code" placeholder="00000-000" />
+            <Field id="checkout-number" label="Número" inputMode="numeric" value={form.number} onChange={set("number")} error={errors.number} placeholder="123" />
+            {cepStatus === "loading" && (
+              <p className="col-span-2 -mt-1 flex items-center gap-1.5 text-[11px] text-neutral-400">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-[#EE4D2D]" />
+                Buscando endereço pelo CEP…
+              </p>
+            )}
+            {cepStatus === "done" && (
+              <p className="col-span-2 -mt-1 text-[11px] text-[#00A884]">Endereço preenchido automaticamente ✓ — confira o número.</p>
+            )}
+            {cepStatus === "error" && (
+              <p className="col-span-2 -mt-1 text-[11px] text-amber-600">CEP não encontrado — preencha o endereço manualmente.</p>
+            )}
             <Field className="col-span-2" label="Rua / Logradouro" value={form.street} onChange={set("street")} error={errors.street} autoComplete="address-line1" placeholder="Rua, avenida…" />
             <Field className="col-span-2" label="Complemento (opcional)" value={form.complement} onChange={set("complement")} error={errors.complement} placeholder="Apto, bloco…" />
             <Field className="col-span-2" label="Bairro" value={form.neighborhood} onChange={set("neighborhood")} error={errors.neighborhood} placeholder="Bairro" />
@@ -420,23 +459,26 @@ function PaymentView({
   orderNumber,
   amountCents,
   pix,
+  regenerating,
+  onRegenerate,
 }: {
   orderNumber: string;
   amountCents: number;
   pix: Pix | null;
+  regenerating: boolean;
+  onRegenerate: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  const [remaining, setRemaining] = useState<number>(() =>
-    pix ? Math.max(0, new Date(pix.expiresAt).getTime() - Date.now()) : 0
-  );
+  const [now, setNow] = useState<number>(() => Date.now());
+  const remaining = pix ? Math.max(0, new Date(pix.expiresAt).getTime() - now) : 0;
+  const expired = Boolean(pix) && remaining <= 0;
 
-  // Countdown
+  // Relógio de 1s. remaining/expired/countdown são DERIVADOS dele, então um Pix
+  // regerado (novo expiresAt) reinicia a contagem sozinho — sem setState em efeito.
   useEffect(() => {
-    if (!pix) return;
-    const target = new Date(pix.expiresAt).getTime();
-    const iv = setInterval(() => setRemaining(Math.max(0, target - Date.now())), 1000);
+    const iv = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(iv);
-  }, [pix]);
+  }, []);
 
   // Polling de confirmação (fallback ao webhook)
   useEffect(() => {
@@ -459,7 +501,9 @@ function PaymentView({
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
     const s = total % 60;
-    return `${h} horas ${m} minutos ${s} segundos`;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    if (h > 0) return `${h} horas ${pad(m)} minutos ${pad(s)} segundos`;
+    return `${m} minutos ${pad(s)} segundos`;
   }, [remaining]);
 
   const copy = useCallback(async () => {
@@ -484,8 +528,14 @@ function PaymentView({
         <div className="flex items-start justify-between gap-4 border-t border-neutral-100 px-4 py-4">
           <span className="text-sm text-neutral-800">Pague dentro de</span>
           <div className="text-right">
-            <p className="text-sm font-medium text-[#EE4D2D]">{countdown}</p>
-            {pix && <p className="mt-0.5 text-xs text-neutral-400">{deadlineLabel(pix.expiresAt)}</p>}
+            {expired ? (
+              <p className="text-sm font-semibold text-red-500">Pix expirado</p>
+            ) : (
+              <>
+                <p className="text-sm font-medium text-[#EE4D2D]">{countdown}</p>
+                {pix && <p className="mt-0.5 text-xs text-neutral-400">{deadlineLabel(pix.expiresAt)}</p>}
+              </>
+            )}
           </div>
         </div>
       </section>
@@ -536,25 +586,42 @@ function PaymentView({
         </ol>
       </section>
 
-      {/* Status + OK */}
+      {/* Status + ação */}
       <div className="fixed inset-x-0 bottom-0 z-20 border-t border-neutral-200 bg-white">
         <div className="mx-auto w-full max-w-lg px-4 py-2.5">
-          <div className="mb-2 flex items-center justify-center gap-2 text-xs text-neutral-500">
-            <span className="h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-[#EE4D2D]" />
-            Aguardando confirmação do pagamento…
-          </div>
-          <button
-            type="button"
-            onClick={async () => {
-              const r = await fetch(`/api/checkout/${orderNumber}/status`, { cache: "no-store" });
-              const d = await r.json().catch(() => ({}));
-              if (d.status === "PAID" && d.redirectUrl) window.location.href = d.redirectUrl;
-            }}
-            className="h-12 w-full rounded-lg text-sm font-semibold text-white"
-            style={{ backgroundColor: SHOPEE }}
-          >
-            Já fiz o pagamento
-          </button>
+          {expired ? (
+            <>
+              <p className="mb-2 text-center text-xs text-neutral-500">O código Pix expirou. Gere um novo para concluir o pagamento.</p>
+              <button
+                type="button"
+                onClick={onRegenerate}
+                disabled={regenerating}
+                className="h-12 w-full rounded-lg text-sm font-semibold text-white disabled:opacity-60"
+                style={{ backgroundColor: SHOPEE }}
+              >
+                {regenerating ? "Gerando novo Pix…" : "Gerar novo Pix"}
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="mb-2 flex items-center justify-center gap-2 text-xs text-neutral-500">
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-neutral-300 border-t-[#EE4D2D]" />
+                Aguardando confirmação do pagamento…
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const r = await fetch(`/api/checkout/${orderNumber}/status`, { cache: "no-store" });
+                  const d = await r.json().catch(() => ({}));
+                  if (d.status === "PAID" && d.redirectUrl) window.location.href = d.redirectUrl;
+                }}
+                className="h-12 w-full rounded-lg text-sm font-semibold text-white"
+                style={{ backgroundColor: SHOPEE }}
+              >
+                Já fiz o pagamento
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>

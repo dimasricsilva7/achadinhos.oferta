@@ -54,29 +54,34 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
 
   try {
-    // Se o PIX já foi gerado antes (reload/duplo-envio), reaproveita em vez de criar
-    // outra cobrança — a Idempotency-Key abaixo também protege no lado da BravoPay.
+    // Se já existe um PIX PENDENTE para este pedido, reaproveita (cobre reload e
+    // duplo-clique). Se o anterior já foi pago, manda para a confirmação. Se expirou
+    // ou falhou, segue adiante e gera um novo código.
     if (order.gatewayTransactionId) {
       const existing = await getTransaction(orderNumber);
-      if (existing?.pix) {
+      if (existing?.status === "PAID") {
+        return NextResponse.json({ status: "PAID", redirectUrl: `/obrigado?pedido=${encodeURIComponent(orderNumber)}` });
+      }
+      if (existing?.pix && existing.status === "PENDING") {
         return NextResponse.json({
-          status: existing.status === "PAID" ? "PAID" : "PENDING",
+          status: "PENDING",
           copyPaste: existing.pix.copy_paste,
           expiresAt: existing.pix.expires_at,
           amountCents,
-          ...(existing.status === "PAID" ? { redirectUrl: `/obrigado?pedido=${encodeURIComponent(orderNumber)}` } : {}),
         });
       }
     }
 
     const tx = await createPixTransaction({
       amountCents,
-      idempotencyKey: `pix_${orderNumber}`,
+      // Chave de idempotência única por tentativa ao regerar após expirar, para a
+      // BravoPay criar uma cobrança nova em vez de devolver a antiga.
+      idempotencyKey: order.gatewayTransactionId ? `pix_${orderNumber}_${Date.now()}` : `pix_${orderNumber}`,
       externalReference: orderNumber,
       description: `Pedido ${orderNumber} - ${order.product.name}`.slice(0, 300),
       customer: { name: d.name, email: d.email, cpf: d.cpf, phone: d.phone },
       metadata: { orderNumber, productSlug: order.product.slug },
-      expiresInSeconds: 86_400,
+      expiresInSeconds: 900,
     });
 
     await db.order.update({ where: { id: order.id }, data: { gatewayTransactionId: tx.id } });
