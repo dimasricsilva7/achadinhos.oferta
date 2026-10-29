@@ -119,6 +119,49 @@ export const checkoutStartSchema = z.object({
   addonIds: z.array(z.string()).default([]),
 });
 
+// Validação de CPF (dígitos verificadores). A BravoPay recusa CPFs inválidos, então
+// barramos aqui antes de criar a cobrança, dando uma mensagem clara ao cliente.
+export function isValidCPF(raw: string): boolean {
+  const cpf = raw.replace(/\D/g, "");
+  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
+  const digits = cpf.split("").map(Number);
+  for (let t = 9; t < 11; t++) {
+    let sum = 0;
+    for (let i = 0; i < t; i++) sum += digits[i] * (t + 1 - i);
+    const check = ((sum * 10) % 11) % 10;
+    if (check !== digits[t]) return false;
+  }
+  return true;
+}
+
+// Dados do cliente coletados na tela de checkout (visual Shopee) antes de gerar o
+// PIX. O valor nunca vem daqui — só identidade e endereço de entrega.
+export const checkoutPaySchema = z.object({
+  name: z.string().trim().min(2, "Informe seu nome completo").max(120),
+  email: z.string().trim().email("E-mail inválido").max(160),
+  phone: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length >= 10 && v.length <= 11, "Telefone (DDD + número) inválido"),
+  cpf: z
+    .string()
+    .trim()
+    .refine(isValidCPF, "CPF inválido"),
+  cep: z
+    .string()
+    .trim()
+    .transform((v) => v.replace(/\D/g, ""))
+    .refine((v) => v.length === 8, "CEP inválido"),
+  street: z.string().trim().min(2, "Informe a rua").max(200),
+  number: z.string().trim().min(1, "Informe o número").max(20),
+  complement: z.string().trim().max(200).optional().default(""),
+  neighborhood: z.string().trim().min(1, "Informe o bairro").max(120),
+  city: z.string().trim().min(1, "Informe a cidade").max(120),
+  state: z.string().trim().length(2, "UF inválida").toUpperCase(),
+});
+export type CheckoutPayInput = z.infer<typeof checkoutPaySchema>;
+
 export const orderStatusUpdateSchema = z.object({
   status: z.enum(ADMIN_SETTABLE_ORDER_STATUS),
 });
