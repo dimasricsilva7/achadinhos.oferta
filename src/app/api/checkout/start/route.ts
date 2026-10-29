@@ -43,17 +43,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // effective.checkoutUrl is only a per-product/variant override (rare). The normal
-  // path is env.CHECKOUT_BASE_URL — the checkout-bravopay app — with the orderNumber
-  // appended so it can look up product/price via GET /api/public/orders/[orderNumber].
-  const checkoutBase = effective.checkoutUrl || process.env.CHECKOUT_BASE_URL;
-  if (!checkoutBase) {
-    return NextResponse.json(
-      { error: "Checkout não configurado. Defina CHECKOUT_BASE_URL ou a URL de checkout no painel administrativo." },
-      { status: 422 }
-    );
-  }
-
   // Offers are informational at the product-page level, but the charged price is
   // always product.priceCents / variant.priceCents — an expired countdown never
   // changes what gets charged, and neither does a manipulated client clock.
@@ -65,9 +54,15 @@ export async function POST(req: NextRequest) {
   const addonsCents = chosenAddons.reduce((sum, a) => sum + a.priceCents, 0);
   const addonsSnapshot = chosenAddons.map((a) => ({ id: a.id, title: a.title, priceCents: a.priceCents }));
 
+  // Checkout embutido: o pagamento (PIX/BravoPay) é servido por ESTE mesmo app em
+  // /checkout/[orderNumber]. Ignoramos o checkoutUrl por produto e o CHECKOUT_BASE_URL
+  // legados — apontavam para o app externo "checkout-bravopay", hoje desativado.
+  const number = orderNumber();
+  const checkoutPath = `/checkout/${number}`;
+
   const order = await db.order.create({
     data: {
-      orderNumber: orderNumber(),
+      orderNumber: number,
       productId: product.id,
       variantId: variant?.id ?? null,
       quantity,
@@ -76,15 +71,12 @@ export async function POST(req: NextRequest) {
       totalCents: effective.priceCents * quantity + addonsCents,
       addonsSnapshot: addonsSnapshot.length > 0 ? JSON.stringify(addonsSnapshot) : null,
       status: "PENDING",
-      checkoutUrl: checkoutBase,
+      checkoutUrl: checkoutPath,
     },
   });
 
-  const separator = checkoutBase.includes("?") ? "&" : "?";
-  const checkoutUrl = `${checkoutBase}${separator}pedido=${encodeURIComponent(order.orderNumber)}`;
-
   return NextResponse.json({
     orderNumber: order.orderNumber,
-    checkoutUrl,
+    checkoutUrl: checkoutPath,
   });
 }
