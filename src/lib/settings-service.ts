@@ -11,6 +11,18 @@ export type SiteSettings = Omit<
   storeRelatedProductIds: string[];
 };
 
+// Default brand image shipped as a static asset in `public/`. Used as the fallback for
+// logo, store logo, favicon and social image whenever the Settings singleton has no value
+// for them — the Vercel Blob store is suspended (Hobby quota), so uploads aren't available
+// and these can't be set through the admin; committing the asset and defaulting to it here
+// guarantees the brand shows up without touching the database.
+const DEFAULT_BRAND_IMAGE = "/brand/shopee-logo.png";
+
+function orDefault(value: string | null, fallback: string): string {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+}
+
 function parseFooterLinks(raw: string | null): FooterLink[] {
   if (!raw) return [];
   try {
@@ -34,6 +46,10 @@ function parseStringArray(raw: string | null): string[] {
 function toSiteSettings(row: Awaited<ReturnType<typeof db.settings.upsert>>): SiteSettings {
   return {
     ...row,
+    logoUrl: orDefault(row.logoUrl, DEFAULT_BRAND_IMAGE),
+    faviconUrl: orDefault(row.faviconUrl, DEFAULT_BRAND_IMAGE),
+    socialImageUrl: orDefault(row.socialImageUrl, DEFAULT_BRAND_IMAGE),
+    storeLogoUrl: orDefault(row.storeLogoUrl, DEFAULT_BRAND_IMAGE),
     footerLinks: parseFooterLinks(row.footerLinks),
     storeRelatedProductIds: parseStringArray(row.storeRelatedProductIds),
   };
