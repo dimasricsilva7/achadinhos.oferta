@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { getSettings } from "@/lib/settings-service";
 import { sendAddToCartEvent } from "@/lib/meta-capi";
 
-// Called client-side right when the "Comprar" button is clicked (see
-// ProductExperience.tsx handleBuy), same instant as fbq('track', 'AddToCart', ...,
-// { eventID }) fires in the browser, passing the SAME eventId so Meta deduplicates
-// the client + server events. This site has no real cart step — "Comprar" doubles as
-// the add-to-cart signal for ad platforms.
+// Chamado no cliente ao clicar em "Comprar" (ver ProductExperience.tsx handleBuy), no
+// mesmo instante do fbq('track','AddToCart', ..., { eventID }), com o mesmo eventId
+// para dedup cliente + servidor. Esta loja não tem carrinho — "Comprar" é o sinal de
+// AddToCart para as plataformas de anúncio. Enviado a todos os pixels.
 const bodySchema = z.object({
   eventId: z.string().min(1).max(200),
   productId: z.string().min(1).max(100),
@@ -15,17 +13,11 @@ const bodySchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
-  const parsed = bodySchema.safeParse(body);
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
   }
   const { eventId, productId, valueCents } = parsed.data;
-
-  const settings = await getSettings();
-  if (!settings.metaPixelId) {
-    return NextResponse.json({ ok: true, skipped: true });
-  }
 
   const forwardedFor = req.headers.get("x-forwarded-for");
   const clientIp = forwardedFor ? forwardedFor.split(",")[0]?.trim() : null;
@@ -34,7 +26,6 @@ export async function POST(req: NextRequest) {
 
   const result = await sendAddToCartEvent({
     eventId,
-    pixelId: settings.metaPixelId,
     valueCents,
     productId,
     eventSourceUrl: origin,
@@ -42,5 +33,5 @@ export async function POST(req: NextRequest) {
     clientUserAgent,
   });
 
-  return NextResponse.json({ ok: true, sent: result.ok });
+  return NextResponse.json({ ok: true, sent: result.sent, total: result.total });
 }

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { formatCentsBRL } from "@/lib/money";
 import { getSettings } from "@/lib/settings-service";
+import { getMetaPixelIds } from "@/lib/meta-config";
 import { PurchasePixel } from "@/components/site/PurchasePixel";
 import { ObrigadoConfetti } from "@/components/site/ObrigadoConfetti";
 import { CopyOrderNumber } from "@/components/site/CopyOrderNumber";
@@ -287,7 +288,7 @@ export default async function ObrigadoPage({
       </Link>
 
       <PurchasePixel
-        pixelConfigured={Boolean(settings.metaPixelId)}
+        pixelConfigured={getMetaPixelIds().length > 0}
         order={
           order && order.status === "PAID"
             ? { orderNumber: order.orderNumber, totalCents: order.totalCents }
