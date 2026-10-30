@@ -118,7 +118,13 @@ export function SettingsForm({
       const res = await fetch("/api/admin/upload", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Falha no upload");
+        // Antes o erro era guardado mas nunca aparecia (a caixa de erro só surge
+        // com saveState === "error"). Agora o upload falho fica visível.
+        setSaveState("error");
+        setError(
+          (data.error ?? "Falha no upload") +
+            " — se o upload estiver fora do ar, cole o link direto da imagem no campo acima."
+        );
         return;
       }
       if (field === "logoUrl") setLogoUrl(data.url);
@@ -241,6 +247,7 @@ export function SettingsForm({
             url={logoUrl}
             uploading={uploadingField === "logoUrl"}
             onUpload={(f) => handleUpload("logoUrl", f)}
+            onUrlChange={setLogoUrl}
             onClear={() => setLogoUrl("")}
           />
           <ImageField
@@ -248,6 +255,7 @@ export function SettingsForm({
             url={faviconUrl}
             uploading={uploadingField === "faviconUrl"}
             onUpload={(f) => handleUpload("faviconUrl", f)}
+            onUrlChange={setFaviconUrl}
             onClear={() => setFaviconUrl("")}
           />
           <ImageField
@@ -255,6 +263,7 @@ export function SettingsForm({
             url={socialImageUrl}
             uploading={uploadingField === "socialImageUrl"}
             onUpload={(f) => handleUpload("socialImageUrl", f)}
+            onUrlChange={setSocialImageUrl}
             onClear={() => setSocialImageUrl("")}
           />
           <Field label="Telefone">
@@ -379,6 +388,7 @@ export function SettingsForm({
             url={storeLogoUrl}
             uploading={uploadingField === "storeLogoUrl"}
             onUpload={(f) => handleUpload("storeLogoUrl", f)}
+            onUrlChange={setStoreLogoUrl}
             onClear={() => setStoreLogoUrl("")}
           />
           <div className="grid grid-cols-2 gap-3">
@@ -624,18 +634,20 @@ function ImageField({
   url,
   uploading,
   onUpload,
+  onUrlChange,
   onClear,
 }: {
   label: string;
   url: string;
   uploading: boolean;
   onUpload: (file: File) => void;
+  onUrlChange: (url: string) => void;
   onClear: () => void;
 }) {
   return (
     <Field label={label}>
-      <div className="flex items-center gap-3">
-        <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-lg border border-border bg-neutral-100">
+      <div className="flex items-start gap-3">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-neutral-100">
           <FallbackImg
             src={url}
             alt=""
@@ -643,22 +655,41 @@ function ImageField({
             placeholder={<span className="text-[10px] text-foreground/40">sem imagem</span>}
           />
         </div>
-        <input
-          type="file"
-          accept="image/jpeg,image/png,image/webp,image/avif"
-          disabled={uploading}
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) onUpload(file);
-            e.target.value = "";
-          }}
-        />
-        {url && (
-          <button type="button" onClick={onClear} className="text-xs text-price">
-            Remover
-          </button>
-        )}
-        {uploading && <span className="text-xs text-foreground/50">Enviando…</span>}
+        <div className="flex flex-1 flex-col gap-2">
+          {/* Colar um link direto da imagem — não depende do Vercel Blob (que pode
+              estar suspenso por cota). É o caminho recomendado enquanto o upload
+              estiver indisponível. */}
+          <input
+            type="url"
+            value={url}
+            onChange={(e) => onUrlChange(e.target.value)}
+            placeholder="Cole aqui o link da imagem (https://…)"
+            className="input"
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/avif"
+              disabled={uploading}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) onUpload(file);
+                e.target.value = "";
+              }}
+              className="text-xs"
+            />
+            {url && (
+              <button type="button" onClick={onClear} className="text-xs text-price">
+                Remover
+              </button>
+            )}
+            {uploading && <span className="text-xs text-foreground/50">Enviando…</span>}
+          </div>
+          <p className="text-[11px] text-foreground/45">
+            Dica: cole um link direto da imagem (terminando em .jpg, .png, .webp). O upload de arquivo
+            depende do armazenamento da Vercel, que pode estar temporariamente indisponível.
+          </p>
+        </div>
       </div>
     </Field>
   );
