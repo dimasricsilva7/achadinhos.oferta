@@ -42,7 +42,11 @@ export function PurchasePixel({
     // page — see checkout-bravopay/src/routes/checkout.js), so it's idempotent either
     // way (Order.metaPurchaseEventSentAt). The client fbq call below is best-effort on
     // top of that, with a short poll for late-attaching fbq — never blocks the CAPI call.
-    const eventId = crypto.randomUUID();
+    // eventId DETERMINÍSTICO por pedido: se /obrigado recarregar, o navegador dispara
+    // Purchase de novo, mas com o MESMO eventID — então o Meta deduplica e conta só
+    // uma compra por pedido, em cada pixel (o servidor é idempotente via
+    // Order.metaPurchaseEventSentAt).
+    const eventId = `purchase_${order.orderNumber}`;
     fetch("/api/meta/purchase", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

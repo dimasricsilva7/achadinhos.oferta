@@ -1,151 +1,121 @@
-// Meta Conversions API (server-side) — sends the "Purchase" event as a reinforcement
-// alongside the client-side Pixel event fired on /obrigado. Shares the same eventId
-// with the client call so Meta deduplicates the pair automatically.
+// Meta Conversions API (server-side). Cada evento é enviado para TODOS os pixels
+// configurados em META_CAPI_TOKENS (cada um com seu token), sempre com o MESMO
+// event_id do evento disparado no navegador — assim o Meta deduplica o par
+// navegador+servidor POR PIXEL, e um reload nunca vira uma segunda conversão.
 //
-// META_CAPI_ACCESS_TOKEN is a real secret: read only from process.env here, never
-// stored in the database, never returned from any API response, never logged in
-// full (see truncation below). The Pixel ID (settings.metaPixelId) is NOT a secret
-// and is stored in Settings — see src/lib/settings-service.ts.
+// Os tokens são segredos: lidos só de env (META_CAPI_TOKENS), nunca no banco, nunca
+// retornados por API, nunca logados por inteiro.
+
+import { getMetaCapiPairs } from "@/lib/meta-config";
 
 const GRAPH_API_VERSION = "v21.0";
 
-type SendEventInput = {
-  eventName: "Purchase" | "AddToCart" | "ViewContent";
+type EventContext = {
   eventId: string;
-  pixelId: string;
   eventSourceUrl: string;
   clientIp?: string | null;
   clientUserAgent?: string | null;
-  customData: Record<string, unknown>;
 };
 
-// Never throws — this is telemetry, not part of the checkout/thank-you critical
-// path. Callers should not await-block page rendering on this failing.
-export async function sendEvent(input: SendEventInput): Promise<{ ok: boolean }> {
-  const accessToken = process.env.META_CAPI_ACCESS_TOKEN;
-  if (!accessToken) {
-    console.warn("[meta-capi] META_CAPI_ACCESS_TOKEN not set — skipping Conversions API call");
-    return { ok: false };
-  }
-
-  const url = `https://graph.facebook.com/${GRAPH_API_VERSION}/${input.pixelId}/events`;
-
+async function postToPixel(
+  pixelId: string,
+  token: string,
+  eventName: string,
+  ctx: EventContext,
+  customData: Record<string, unknown>
+): Promise<boolean> {
   const payload = {
     data: [
       {
-        event_name: input.eventName,
+        event_name: eventName,
         event_time: Math.floor(Date.now() / 1000),
-        event_id: input.eventId,
-        event_source_url: input.eventSourceUrl,
+        event_id: ctx.eventId,
+        event_source_url: ctx.eventSourceUrl,
         action_source: "website",
         user_data: {
-          client_ip_address: input.clientIp ?? undefined,
-          client_user_agent: input.clientUserAgent ?? undefined,
+          client_ip_address: ctx.clientIp ?? undefined,
+          client_user_agent: ctx.clientUserAgent ?? undefined,
         },
-        custom_data: input.customData,
+        custom_data: customData,
       },
     ],
   };
 
   try {
-    const res = await fetch(`${url}?access_token=${accessToken}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      // Never log the full URL/body here — it contains the access token as a query
-      // param. Log only status + a truncated response for diagnosis.
-      const text = await res.text().catch(() => "");
-      console.error(
-        `[meta-capi] Graph API responded ${res.status} for event ${input.eventName}/${input.eventId}: ${text.slice(0, 300)}`
-      );
-      return { ok: false };
-    }
-
-    return { ok: true };
-  } catch (err) {
-    console.error(
-      `[meta-capi] Failed to send ${input.eventName} event ${input.eventId}:`,
-      err instanceof Error ? err.message : err
+    const res = await fetch(
+      `https://graph.facebook.com/${GRAPH_API_VERSION}/${pixelId}/events?access_token=${token}`,
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }
     );
-    return { ok: false };
+    if (!res.ok) {
+      // Nunca logar a URL/token — só status + trecho da resposta para diagnóstico.
+      const text = await res.text().catch(() => "");
+      console.error(`[meta-capi] Graph API ${res.status} em ${eventName}/${ctx.eventId} (pixel ${pixelId}): ${text.slice(0, 300)}`);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(`[meta-capi] Falha em ${eventName}/${ctx.eventId} (pixel ${pixelId}):`, err instanceof Error ? err.message : err);
+    return false;
   }
 }
 
-type SendPurchaseEventInput = {
+// Nunca lança — é telemetria, fora do caminho crítico do checkout/obrigado.
+async function sendToAllPixels(
+  eventName: string,
+  ctx: EventContext,
+  customData: Record<string, unknown>
+): Promise<{ ok: boolean; sent: number; total: number }> {
+  const pairs = getMetaCapiPairs();
+  if (pairs.length === 0) {
+    console.warn("[meta-capi] META_CAPI_TOKENS não configurado — pulando Conversions API");
+    return { ok: false, sent: 0, total: 0 };
+  }
+  const results = await Promise.all(pairs.map((p) => postToPixel(p.pixelId, p.token, eventName, ctx, customData)));
+  const sent = results.filter(Boolean).length;
+  return { ok: sent > 0, sent, total: pairs.length };
+}
+
+export function sendPurchaseEvent(input: {
   eventId: string;
-  pixelId: string;
   valueCents: number;
   orderNumber: string;
   eventSourceUrl: string;
   clientIp?: string | null;
   clientUserAgent?: string | null;
-};
-
-export async function sendPurchaseEvent(input: SendPurchaseEventInput): Promise<{ ok: boolean }> {
-  return sendEvent({
-    eventName: "Purchase",
-    eventId: input.eventId,
-    pixelId: input.pixelId,
-    eventSourceUrl: input.eventSourceUrl,
-    clientIp: input.clientIp,
-    clientUserAgent: input.clientUserAgent,
-    customData: { currency: "BRL", value: input.valueCents / 100, order_id: input.orderNumber },
-  });
+}) {
+  return sendToAllPixels(
+    "Purchase",
+    { eventId: input.eventId, eventSourceUrl: input.eventSourceUrl, clientIp: input.clientIp, clientUserAgent: input.clientUserAgent },
+    { currency: "BRL", value: input.valueCents / 100, order_id: input.orderNumber }
+  );
 }
 
-type SendViewContentEventInput = {
+export function sendViewContentEvent(input: {
   eventId: string;
-  pixelId: string;
   valueCents: number;
   productId: string;
   eventSourceUrl: string;
   clientIp?: string | null;
   clientUserAgent?: string | null;
-};
-
-export async function sendViewContentEvent(input: SendViewContentEventInput): Promise<{ ok: boolean }> {
-  return sendEvent({
-    eventName: "ViewContent",
-    eventId: input.eventId,
-    pixelId: input.pixelId,
-    eventSourceUrl: input.eventSourceUrl,
-    clientIp: input.clientIp,
-    clientUserAgent: input.clientUserAgent,
-    customData: {
-      currency: "BRL",
-      value: input.valueCents / 100,
-      content_ids: [input.productId],
-      content_type: "product",
-    },
-  });
+}) {
+  return sendToAllPixels(
+    "ViewContent",
+    { eventId: input.eventId, eventSourceUrl: input.eventSourceUrl, clientIp: input.clientIp, clientUserAgent: input.clientUserAgent },
+    { currency: "BRL", value: input.valueCents / 100, content_ids: [input.productId], content_type: "product" }
+  );
 }
 
-type SendAddToCartEventInput = {
+export function sendAddToCartEvent(input: {
   eventId: string;
-  pixelId: string;
   valueCents: number;
   productId: string;
   eventSourceUrl: string;
   clientIp?: string | null;
   clientUserAgent?: string | null;
-};
-
-export async function sendAddToCartEvent(input: SendAddToCartEventInput): Promise<{ ok: boolean }> {
-  return sendEvent({
-    eventName: "AddToCart",
-    eventId: input.eventId,
-    pixelId: input.pixelId,
-    eventSourceUrl: input.eventSourceUrl,
-    clientIp: input.clientIp,
-    clientUserAgent: input.clientUserAgent,
-    customData: {
-      currency: "BRL",
-      value: input.valueCents / 100,
-      content_ids: [input.productId],
-      content_type: "product",
-    },
-  });
+}) {
+  return sendToAllPixels(
+    "AddToCart",
+    { eventId: input.eventId, eventSourceUrl: input.eventSourceUrl, clientIp: input.clientIp, clientUserAgent: input.clientUserAgent },
+    { currency: "BRL", value: input.valueCents / 100, content_ids: [input.productId], content_type: "product" }
+  );
 }

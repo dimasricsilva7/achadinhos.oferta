@@ -1,22 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getSettings } from "@/lib/settings-service";
 import { sendPurchaseEvent } from "@/lib/meta-capi";
 
-// Called client-side from /obrigado (fetch) right after fbq('track', 'Purchase', ...,
-// { eventID }) fires in the browser, passing the SAME eventId so Meta deduplicates
-// the client + server events. Only makes sense when a real Order was found on the
-// thank-you page — the generic (no-correlation) case never calls this route, since
-// there is no real order to report to the Conversions API.
+// Chamado no cliente a partir de /obrigado, logo após fbq('track','Purchase', ...,
+// { eventID }), passando o MESMO eventId para o Meta deduplicar cliente + servidor.
+// O eventId é determinístico por pedido (purchase_<orderNumber>), então nem reload
+// nem retry geram uma segunda conversão.
 const bodySchema = z.object({
   eventId: z.string().min(1).max(200),
   orderNumber: z.string().min(1).max(100),
 });
 
 export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => null);
-  const parsed = bodySchema.safeParse(body);
+  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Requisição inválida" }, { status: 400 });
   }
@@ -27,21 +24,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Pedido não encontrado" }, { status: 404 });
   }
   if (order.status !== "PAID") {
-    // Never report a conversion for money that hasn't actually landed — inflates
-    // Meta's data and throws off ROAS-based optimization.
+    // Nunca reportar conversão de dinheiro que não entrou — infla os dados e bagunça
+    // a otimização por ROAS.
     return NextResponse.json({ error: "Pedido ainda não pago" }, { status: 409 });
   }
 
-  // Idempotent: a reload of /obrigado (or a retried fetch) never double-sends the
-  // server-side event for the same order.
+  // Idempotente: reload de /obrigado (ou refetch) nunca reenvia o Purchase server-side
+  // para o mesmo pedido — reforça o "sem enviar o mesmo evento de compra mais de 1x".
   if (order.metaPurchaseEventSentAt) {
     return NextResponse.json({ ok: true, alreadySent: true });
-  }
-
-  const settings = await getSettings();
-  if (!settings.metaPixelId) {
-    // No Pixel configured — nothing to report server-side either.
-    return NextResponse.json({ ok: true, skipped: true });
   }
 
   const forwardedFor = req.headers.get("x-forwarded-for");
@@ -51,7 +42,6 @@ export async function POST(req: NextRequest) {
 
   const result = await sendPurchaseEvent({
     eventId,
-    pixelId: settings.metaPixelId,
     valueCents: order.totalCents,
     orderNumber: order.orderNumber,
     eventSourceUrl: `${origin}/obrigado`,
@@ -59,6 +49,7 @@ export async function POST(req: NextRequest) {
     clientUserAgent,
   });
 
+  // Marca como enviado quando pelo menos um pixel aceitou — evita reenvio em reloads.
   if (result.ok) {
     await db.order.update({
       where: { id: order.id },
@@ -66,6 +57,5 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Telemetry — don't fail the client just because Graph API had an issue.
-  return NextResponse.json({ ok: true, sent: result.ok });
+  return NextResponse.json({ ok: true, sent: result.sent, total: result.total });
 }

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import { getSettings } from "@/lib/settings-service";
+import { getMetaPixelIds } from "@/lib/meta-config";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import "./globals.css";
 
@@ -45,6 +46,7 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const settings = await getSettings();
+  const pixelIds = getMetaPixelIds();
 
   return (
     <html
@@ -65,11 +67,12 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
 }`}</style>
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
-        {settings.metaPixelId && (
+        {pixelIds.length > 0 && (
           <>
-            {/* Meta Pixel base code — fires PageView on every page. Purchase is fired
-                separately on /obrigado, alongside the server-side Conversions API call
-                (see src/lib/meta-capi.ts), with a shared eventID for dedup. */}
+            {/* Meta Pixel base code — inicializa TODOS os pixels (META_PIXEL_IDS) e dispara
+                PageView uma vez. Cada fbq('track', ...) atinge todos os pixels inicializados.
+                Purchase é disparado separadamente em /obrigado, junto do Conversions API
+                (ver src/lib/meta-capi.ts), com eventID compartilhado para dedup por pixel. */}
             <Script id="meta-pixel-base" strategy="afterInteractive">
               {`!function(f,b,e,v,n,t,s)
 {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
@@ -79,18 +82,21 @@ n.queue=[];t=b.createElement(e);t.async=!0;
 t.src=v;s=b.getElementsByTagName(e)[0];
 s.parentNode.insertBefore(t,s)}(window, document,'script',
 'https://connect.facebook.net/en_US/fbevents.js');
-fbq('init', '${settings.metaPixelId}');
+${pixelIds.map((id) => `fbq('init', '${id}');`).join("\n")}
 fbq('track', 'PageView');`}
             </Script>
             <noscript>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                height="1"
-                width="1"
-                style={{ display: "none" }}
-                alt=""
-                src={`https://www.facebook.com/tr?id=${settings.metaPixelId}&ev=PageView&noscript=1`}
-              />
+              {pixelIds.map((id) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={id}
+                  height="1"
+                  width="1"
+                  style={{ display: "none" }}
+                  alt=""
+                  src={`https://www.facebook.com/tr?id=${id}&ev=PageView&noscript=1`}
+                />
+              ))}
             </noscript>
           </>
         )}
