@@ -4,6 +4,7 @@ import Script from "next/script";
 import { getSettings } from "@/lib/settings-service";
 import { getMetaPixelIds } from "@/lib/meta-config";
 import { SiteFooter } from "@/components/site/SiteFooter";
+import { Pinger } from "@/components/site/Pinger";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -100,6 +101,7 @@ fbq('track', 'PageView');`}
             </noscript>
           </>
         )}
+        <Pinger />
         <div className="flex min-h-full flex-1 flex-col">{children}</div>
         <SiteFooter
           footerText={settings.footerText}
