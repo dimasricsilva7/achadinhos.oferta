@@ -339,3 +339,19 @@ model AuditLog {
   @@index([createdAt])
   @@index([entity, entityId])
 }
+
+// Heartbeat do "Online ao vivo" (admin). Uma linha por aba/sessão do visitante,
+// atualizada a cada ping (~25s). Anônimo: só id de sessão/visitante + página atual.
+// "Online agora" = lastSeenAt dentro da janela (ver src/lib/online.ts).
+model VisitorSession {
+  id          String   @id // id de sessão gerado no cliente
+  visitorId   String
+  path        String?
+  device      String?
+  referrer    String?
+  pageViews   Int      @default(1)
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@index([lastSeenAt])
+}
