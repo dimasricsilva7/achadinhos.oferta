@@ -14,6 +14,37 @@ export type OnlineData = { count: number; rows: OnlineRow[]; ok: boolean };
 
 const cut = (v: string | null | undefined, n: number) => (v ? String(v).slice(0, n) : null);
 
+// O banco de produção foi criado via `db push` (sem histórico de migrações), então
+// não dá pra usar `prisma migrate deploy` no deploy. Criamos a tabela aqui, de forma
+// idempotente, na primeira vez que o tracking roda. Cacheado por instância; em caso
+// de erro reseta pra tentar de novo no próximo request.
+let ensured: Promise<void> | null = null;
+function ensureTable(): Promise<void> {
+  if (!ensured) {
+    ensured = (async () => {
+      await db.$executeRawUnsafe(
+        `CREATE TABLE IF NOT EXISTS "VisitorSession" (
+          "id" TEXT NOT NULL PRIMARY KEY,
+          "visitorId" TEXT NOT NULL,
+          "path" TEXT,
+          "device" TEXT,
+          "referrer" TEXT,
+          "pageViews" INTEGER NOT NULL DEFAULT 1,
+          "firstSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "lastSeenAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`,
+      );
+      await db.$executeRawUnsafe(
+        `CREATE INDEX IF NOT EXISTS "VisitorSession_lastSeenAt_idx" ON "VisitorSession" ("lastSeenAt")`,
+      );
+    })().catch((e) => {
+      ensured = null;
+      throw e;
+    });
+  }
+  return ensured;
+}
+
 // Heartbeat é a cada ~25s. Janela de 60s = só quem está realmente no site agora
 // (tolera 1 ping perdido).
 const ONLINE_WINDOW_MS = 60_000;
@@ -27,6 +58,7 @@ export async function touchSession(
   referrer: string | null,
 ): Promise<void> {
   const sid = id.slice(0, 64);
+  await ensureTable().catch(() => {});
   await db.visitorSession
     .upsert({
       where: { id: sid },
@@ -57,6 +89,7 @@ function orderNumberFromPath(path: string | null): string | null {
 /** Visitantes realmente ativos agora (atividade no último minuto). */
 export async function onlineNow(limit = 100): Promise<OnlineData> {
   try {
+    await ensureTable();
     const since = new Date(Date.now() - ONLINE_WINDOW_MS);
     const [count, sessions] = await Promise.all([
       db.visitorSession.count({ where: { lastSeenAt: { gte: since } } }),
