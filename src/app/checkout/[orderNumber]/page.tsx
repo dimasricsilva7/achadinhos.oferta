@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { getSettings } from "@/lib/settings-service";
 import { computeShippingCents, amountToChargeCents } from "@/lib/payments/orders";
 import { getTransaction } from "@/lib/payments/bravopay";
+import { pixQrDataUrl } from "@/lib/pix-qr";
 import { CheckoutClient, type Pix } from "./CheckoutClient";
 
 export const dynamic = "force-dynamic";
@@ -52,7 +53,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ order
   if (order.gatewayTransactionId) {
     try {
       const tx = await getTransaction(orderNumber);
-      if (tx?.pix) initialPix = { copyPaste: tx.pix.copy_paste, expiresAt: tx.pix.expires_at };
+      if (tx?.pix) initialPix = { copyPaste: tx.pix.copy_paste, expiresAt: tx.pix.expires_at, qr: await pixQrDataUrl(tx.pix.copy_paste) };
     } catch {
       /* gateway indisponível no momento — cai de volta no formulário */
     }
@@ -85,6 +86,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ order
       storeName={settings.siteShortName || settings.siteName}
       initialPix={initialPix}
       prefill={prefill}
+      crediarioEnabled={process.env.CREDIARIO_ENABLED === "true"}
     />
   );
 }
