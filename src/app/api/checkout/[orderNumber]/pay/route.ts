@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { checkoutPaySchema } from "@/lib/validation";
 import { createPixTransaction, getTransaction, BravopayError } from "@/lib/payments/bravopay";
 import { computeShippingCents, amountToChargeCents } from "@/lib/payments/orders";
+import { pixQrDataUrl } from "@/lib/pix-qr";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -67,6 +68,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           status: "PENDING",
           copyPaste: existing.pix.copy_paste,
           expiresAt: existing.pix.expires_at,
+          qr: await pixQrDataUrl(existing.pix.copy_paste),
           amountCents,
         });
       }
@@ -93,6 +95,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       status: "PENDING",
       copyPaste: tx.pix.copy_paste,
       expiresAt: tx.pix.expires_at,
+      qr: await pixQrDataUrl(tx.pix.copy_paste),
       amountCents,
     });
   } catch (err) {

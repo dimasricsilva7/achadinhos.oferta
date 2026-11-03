@@ -9,7 +9,7 @@ const SHOPEE = "#EE4D2D";
 const SHOPEE_DARK = "#D73211";
 const PIX_TEAL = "#2DBBA8";
 
-export type Pix = { copyPaste: string; expiresAt: string };
+export type Pix = { copyPaste: string; expiresAt: string; qr: string | null };
 
 export type CheckoutClientProps = {
   orderNumber: string;
@@ -23,6 +23,9 @@ export type CheckoutClientProps = {
   storeName: string;
   initialPix: Pix | null;
   prefill: Partial<FormState> | null;
+  // Crediário (parcelado) fica atrás desta flag (env CREDIARIO_ENABLED). Desligada,
+  // a opção não aparece — o checkout segue 100% Pix, sem impacto no tráfego do anúncio.
+  crediarioEnabled: boolean;
 };
 
 type FormState = {
@@ -116,6 +119,23 @@ function TruckIcon() {
   );
 }
 
+function CardIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={SHOPEE} strokeWidth="1.8" aria-hidden>
+      <rect x="2" y="5" width="20" height="14" rx="2.5" />
+      <path d="M2 10h20" strokeLinecap="round" />
+      <path d="M6 15h4" strokeLinecap="round" />
+    </svg>
+  );
+}
+function RadioDot({ selected }: { selected: boolean }) {
+  return selected ? (
+    <span className="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border-[6px] border-[#EE4D2D] bg-white" />
+  ) : (
+    <span className="h-5 w-5 flex-shrink-0 rounded-full border-2 border-neutral-300 bg-white" />
+  );
+}
+
 /* ============================ CAMPO ============================ */
 function Field({
   label,
@@ -167,6 +187,7 @@ function Field({
 export function CheckoutClient(props: CheckoutClientProps) {
   const [mode, setMode] = useState<"form" | "payment">(props.initialPix ? "payment" : "form");
   const [pix, setPix] = useState<Pix | null>(props.initialPix);
+  const [method, setMethod] = useState<"pix" | "crediario">("pix");
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, ...(props.prefill ?? {}) });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [topError, setTopError] = useState<string | null>(null);
@@ -220,6 +241,12 @@ export function CheckoutClient(props: CheckoutClientProps) {
 
   async function handleSubmit() {
     if (submitting) return;
+    // Crediário ainda não tem fluxo de cobrança próprio — enquanto não for ligado de
+    // verdade, selecioná-lo não gera Pix nem quebra o checkout.
+    if (method === "crediario") {
+      setTopError("O crediário estará disponível em breve. Por enquanto, finalize no Pix.");
+      return;
+    }
     setSubmitting(true);
     setTopError(null);
     setErrors({});
@@ -240,7 +267,7 @@ export function CheckoutClient(props: CheckoutClientProps) {
         window.location.href = data.redirectUrl;
         return;
       }
-      setPix({ copyPaste: data.copyPaste, expiresAt: data.expiresAt });
+      setPix({ copyPaste: data.copyPaste, expiresAt: data.expiresAt, qr: data.qr ?? null });
       setMode("payment");
       window.scrollTo({ top: 0 });
     } catch {
@@ -258,18 +285,20 @@ export function CheckoutClient(props: CheckoutClientProps) {
           display: none !important;
         }
       `}</style>
-      <header className="sticky top-0 z-10 flex h-14 items-center border-b border-neutral-200 bg-white px-3">
-        <button
-          type="button"
-          aria-label="Voltar"
-          onClick={() => (mode === "payment" ? setMode("form") : window.history.back())}
-          className="flex h-9 w-9 items-center justify-center text-[#EE4D2D]"
-        >
-          <BackIcon />
-        </button>
-        <h1 className="flex-1 pr-9 text-center text-base font-medium text-neutral-800">
-          {mode === "payment" ? "Pagamento" : "Comprar"}
-        </h1>
+      <header className="sticky top-0 z-10 border-b border-neutral-200 bg-white">
+        <div className="mx-auto flex h-14 w-full max-w-lg items-center px-3">
+          <button
+            type="button"
+            aria-label="Voltar"
+            onClick={() => (mode === "payment" ? setMode("form") : window.history.back())}
+            className="flex h-9 w-9 items-center justify-center text-[#EE4D2D]"
+          >
+            <BackIcon />
+          </button>
+          <h1 className="flex-1 pr-9 text-center text-base font-medium text-neutral-800">
+            {mode === "payment" ? "Pagamento" : "Comprar"}
+          </h1>
+        </div>
       </header>
 
       {mode === "form" ? (
@@ -283,6 +312,8 @@ export function CheckoutClient(props: CheckoutClientProps) {
           cepStatus={cepStatus}
           onCepChange={handleCepChange}
           onSubmit={handleSubmit}
+          method={method}
+          onMethodChange={setMethod}
         />
       ) : (
         <PaymentView
@@ -307,6 +338,7 @@ function FormView({
   amountCents,
   deliveryText,
   storeName,
+  crediarioEnabled,
   form,
   set,
   errors,
@@ -315,6 +347,8 @@ function FormView({
   cepStatus,
   onCepChange,
   onSubmit,
+  method,
+  onMethodChange,
 }: CheckoutClientProps & {
   form: FormState;
   set: (k: keyof FormState) => (v: string) => void;
@@ -324,21 +358,41 @@ function FormView({
   cepStatus: "idle" | "loading" | "done" | "error";
   onCepChange: (v: string) => void;
   onSubmit: () => void;
+  method: "pix" | "crediario";
+  onMethodChange: (m: "pix" | "crediario") => void;
 }) {
+  // Endereço recolhido por padrão: só CEP + Número à vista. Abre ao dar erro no CEP
+  // (preenchimento manual) ou quando o cliente clica em "Editar endereço".
+  // Endereço recolhido por padrão. Derivado (sem efeito): abre quando o cliente clica
+  // em editar, quando o CEP falha (preenchimento manual) ou quando o servidor recusa
+  // um campo de endereço — aí o erro precisa ficar visível para ser corrigido.
+  const [addressManuallyOpen, setAddressManuallyOpen] = useState(false);
+  const hasAddressError = ["street", "neighborhood", "city", "state"].some((k) => errors[k]);
+  const addressOpen = addressManuallyOpen || cepStatus === "error" || hasAddressError;
+  const addressSummary = [form.street, form.neighborhood, [form.city, form.state].filter(Boolean).join("/")]
+    .filter(Boolean)
+    .join(", ");
   return (
     <>
-      <div className="mx-auto w-full max-w-lg space-y-2 px-0 pb-28 pt-2 sm:px-3">
-        {/* Dados + endereço */}
+      <div className="mx-auto w-full max-w-lg space-y-2 px-0 pb-28 pt-2 sm:px-3 sm:pt-6">
+        {/* Seus dados */}
+        <section className="bg-white px-4 py-4 sm:rounded-lg">
+          <h2 className="mb-3 text-sm font-semibold text-neutral-800">Seus dados</h2>
+          <div className="grid grid-cols-2 gap-3">
+            <Field className="col-span-2" label="Nome completo" value={form.name} onChange={set("name")} error={errors.name} autoComplete="name" placeholder="Seu nome" />
+            <Field label="Telefone / WhatsApp" inputMode="tel" value={form.phone} onChange={(v) => set("phone")(maskPhone(v))} error={errors.phone} autoComplete="tel" placeholder="(11) 90000-0000" />
+            <Field label="CPF" inputMode="numeric" value={form.cpf} onChange={(v) => set("cpf")(maskCPF(v))} error={errors.cpf} placeholder="000.000.000-00" />
+            <Field className="col-span-2" label="E-mail" type="email" inputMode="email" value={form.email} onChange={set("email")} error={errors.email} autoComplete="email" placeholder="voce@email.com" />
+          </div>
+        </section>
+
+        {/* Endereço de entrega — só CEP + Número à vista; o resto vem do CEP e fica recolhido */}
         <section className="bg-white px-4 py-4 sm:rounded-lg">
           <div className="mb-3 flex items-center gap-2">
             <PinIcon />
-            <h2 className="text-sm font-semibold text-neutral-800">Dados de entrega</h2>
+            <h2 className="text-sm font-semibold text-neutral-800">Endereço de entrega</h2>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Field className="col-span-2" label="Nome completo" value={form.name} onChange={set("name")} error={errors.name} autoComplete="name" placeholder="Seu nome" />
-            <Field className="col-span-2" label="E-mail" type="email" inputMode="email" value={form.email} onChange={set("email")} error={errors.email} autoComplete="email" placeholder="voce@email.com" />
-            <Field label="Telefone / WhatsApp" inputMode="tel" value={form.phone} onChange={(v) => set("phone")(maskPhone(v))} error={errors.phone} autoComplete="tel" placeholder="(11) 90000-0000" />
-            <Field label="CPF" inputMode="numeric" value={form.cpf} onChange={(v) => set("cpf")(maskCPF(v))} error={errors.cpf} placeholder="000.000.000-00" />
             <Field label="CEP" inputMode="numeric" value={form.cep} onChange={onCepChange} error={errors.cep} autoComplete="postal-code" placeholder="00000-000" />
             <Field id="checkout-number" label="Número" inputMode="numeric" value={form.number} onChange={set("number")} error={errors.number} placeholder="123" />
             {cepStatus === "loading" && (
@@ -347,17 +401,35 @@ function FormView({
                 Buscando endereço pelo CEP…
               </p>
             )}
-            {cepStatus === "done" && (
-              <p className="col-span-2 -mt-1 text-[11px] text-[#00A884]">Endereço preenchido automaticamente ✓ — confira o número.</p>
+
+            {/* Resumo do endereço achado pelo CEP + link discreto para editar */}
+            {!addressOpen && cepStatus === "done" && (
+              <div className="col-span-2 -mt-1 flex items-start justify-between gap-3 rounded-lg bg-[#f0fbf8] px-3 py-2">
+                <p className="text-[11px] leading-relaxed text-neutral-600">
+                  <span className="font-medium text-[#00A884]">Endereço preenchido ✓</span>
+                  {addressSummary ? ` ${addressSummary}` : ""}
+                </p>
+                <button type="button" onClick={() => setAddressManuallyOpen(true)} className="flex-shrink-0 text-[11px] font-medium text-[#EE4D2D] underline">
+                  Editar endereço
+                </button>
+              </div>
             )}
-            {cepStatus === "error" && (
-              <p className="col-span-2 -mt-1 text-[11px] text-amber-600">CEP não encontrado — preencha o endereço manualmente.</p>
+            {!addressOpen && cepStatus !== "done" && cepStatus !== "loading" && (
+              <button type="button" onClick={() => setAddressManuallyOpen(true)} className="col-span-2 -mt-1 text-left text-[11px] font-medium text-[#EE4D2D] underline">
+                Preencher endereço manualmente
+              </button>
             )}
-            <Field className="col-span-2" label="Rua / Logradouro" value={form.street} onChange={set("street")} error={errors.street} autoComplete="address-line1" placeholder="Rua, avenida…" />
-            <Field className="col-span-2" label="Complemento (opcional)" value={form.complement} onChange={set("complement")} error={errors.complement} placeholder="Apto, bloco…" />
-            <Field className="col-span-2" label="Bairro" value={form.neighborhood} onChange={set("neighborhood")} error={errors.neighborhood} placeholder="Bairro" />
-            <Field label="Cidade" value={form.city} onChange={set("city")} error={errors.city} placeholder="Cidade" />
-            <Field label="UF" value={form.state} onChange={(v) => set("state")(v.toUpperCase().slice(0, 2))} error={errors.state} maxLength={2} placeholder="SP" />
+
+            {/* Campos completos — ocultos até o cliente querer corrigir (ou erro no CEP) */}
+            {addressOpen && (
+              <>
+                <Field className="col-span-2" label="Rua / Logradouro" value={form.street} onChange={set("street")} error={errors.street} autoComplete="address-line1" placeholder="Rua, avenida…" />
+                <Field className="col-span-2" label="Complemento (opcional)" value={form.complement} onChange={set("complement")} error={errors.complement} placeholder="Apto, bloco…" />
+                <Field className="col-span-2" label="Bairro" value={form.neighborhood} onChange={set("neighborhood")} error={errors.neighborhood} placeholder="Bairro" />
+                <Field label="Cidade" value={form.city} onChange={set("city")} error={errors.city} placeholder="Cidade" />
+                <Field label="UF" value={form.state} onChange={(v) => set("state")(v.toUpperCase().slice(0, 2))} error={errors.state} maxLength={2} placeholder="SP" />
+              </>
+            )}
           </div>
         </section>
 
@@ -401,13 +473,38 @@ function FormView({
         {/* Método de pagamento */}
         <section className="bg-white px-4 py-4 sm:rounded-lg">
           <h2 className="mb-3 text-sm font-semibold text-neutral-800">Método de pagamento</h2>
-          <div className="flex items-center justify-between rounded-lg border border-[#EE4D2D] bg-[#fff6f4] px-3 py-3">
-            <div className="flex items-center gap-2.5">
-              <PixIcon />
-              <span className="text-sm font-medium text-neutral-800">Pix</span>
-              <span className="rounded bg-[#00A884]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#00A884]">Aprovação imediata</span>
-            </div>
-            <span className="flex h-5 w-5 items-center justify-center rounded-full border-[6px] border-[#EE4D2D] bg-white" />
+          <div className="space-y-2.5">
+            <button
+              type="button"
+              onClick={() => onMethodChange("pix")}
+              className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left transition-colors ${
+                method === "pix" ? "border-[#EE4D2D] bg-[#fff6f4]" : "border-neutral-200 bg-white"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <PixIcon />
+                <span className="text-sm font-medium text-neutral-800">Pix</span>
+                <span className="rounded bg-[#00A884]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#00A884]">Aprovação imediata</span>
+              </div>
+              <RadioDot selected={method === "pix"} />
+            </button>
+
+            {crediarioEnabled && (
+              <button
+                type="button"
+                onClick={() => onMethodChange("crediario")}
+                className={`flex w-full items-center justify-between rounded-lg border px-3 py-3 text-left transition-colors ${
+                  method === "crediario" ? "border-[#EE4D2D] bg-[#fff6f4]" : "border-neutral-200 bg-white"
+                }`}
+              >
+                <div className="flex items-center gap-2.5">
+                  <CardIcon />
+                  <span className="text-sm font-medium text-neutral-800">Crediário</span>
+                  <span className="rounded bg-[#EE4D2D]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#EE4D2D]">Parcele sua compra</span>
+                </div>
+                <RadioDot selected={method === "crediario"} />
+              </button>
+            )}
           </div>
         </section>
 
@@ -548,6 +645,22 @@ function PaymentView({
           <PixIcon />
           <span className="text-base font-medium text-neutral-800">Pix</span>
         </div>
+
+        {/* QR Code em destaque — a maioria paga escaneando (principalmente no desktop) */}
+        {pix?.qr && (
+          <div className="mt-4 flex flex-col items-center">
+            <div className="rounded-xl border border-neutral-200 bg-white p-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pix.qr} alt="QR Code do Pix" width={200} height={200} className="h-48 w-48" />
+            </div>
+            <p className="mt-2 text-center text-xs text-neutral-500">Escaneie o QR Code no app do seu banco</p>
+            <div className="mt-4 flex w-full max-w-sm items-center gap-3">
+              <span className="h-px flex-1 bg-neutral-200" />
+              <span className="text-[11px] text-neutral-400">ou use o código</span>
+              <span className="h-px flex-1 bg-neutral-200" />
+            </div>
+          </div>
+        )}
 
         <p className="mt-5 text-center text-sm font-medium text-neutral-700">Código Pix</p>
         <div className="mx-auto mt-2 max-w-sm rounded-lg bg-neutral-100 px-4 py-3">
