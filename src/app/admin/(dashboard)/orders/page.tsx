@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { formatCentsBRL } from "@/lib/money";
 
 type OrderRow = {
@@ -65,26 +66,38 @@ function whatsappHref(phone: string | null, productName: string, orderNumber: st
 }
 
 
-export default function AdminOrdersPage() {
+// Cada visão é um filtro pronto sobre os mesmos pedidos. "Todos gerados" inclui também
+// os cliques que nunca preencheram a ficha (customerName nulo) — é onde aparece quem
+// você viu na tela do Pix mas ainda não deixou os dados.
+const VIEWS = {
+  reais: { label: "Pedidos reais", params: "", hint: "Quem preencheu a ficha do checkout (pago ou não)." },
+  pagos: { label: "Pagos", params: "status=PAID", hint: "Pix confirmado pela BravoPay — dinheiro na conta." },
+  abandonados: { label: "Checkout abandonado", params: "status=PENDING", hint: "Preencheram os dados mas não pagaram — dá pra recuperar por WhatsApp/e-mail." },
+  todos: { label: "Todos gerados", params: "scope=all", hint: "TODOS os pedidos criados, incluindo cliques sem ficha preenchida." },
+} as const;
+type ViewKey = keyof typeof VIEWS;
+
+function AdminOrdersInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const view: ViewKey = (["reais", "pagos", "abandonados", "todos"] as ViewKey[]).includes(searchParams.get("view") as ViewKey)
+    ? (searchParams.get("view") as ViewKey)
+    : "reais";
+
   const [items, setItems] = useState<OrderRow[] | null>(null);
-  const [statusFilter, setStatusFilter] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [emailSentId, setEmailSentId] = useState<string | null>(null);
   const [emailErrorId, setEmailErrorId] = useState<string | null>(null);
-  const statusFilterRef = useRef(statusFilter);
-  statusFilterRef.current = statusFilter;
 
   const load = useCallback(async () => {
-    const params = new URLSearchParams();
-    if (statusFilterRef.current) params.set("status", statusFilterRef.current);
-    const res = await fetch(`/api/admin/orders?${params.toString()}`);
+    const res = await fetch(`/api/admin/orders?${VIEWS[view].params}`);
     const data = await res.json();
     setItems(data.items);
-  }, []);
+  }, [view]);
 
   useEffect(() => {
     load();
-  }, [load, statusFilter]);
+  }, [load]);
 
   // Keep the panel current without a manual refresh — payments confirmed by
   // checkout-bravopay's webhook can land at any time.
@@ -119,18 +132,25 @@ export default function AdminOrdersPage() {
 
   return (
     <div>
-      <h1 className="mb-6 text-lg font-bold text-foreground">Pedidos</h1>
+      <h1 className="mb-4 text-lg font-bold text-foreground">Pedidos</h1>
 
-      <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="mb-4 rounded-lg border border-border px-3 py-2 text-sm">
-        <option value="">Todos</option>
-        <option value="PENDING">Pendente</option>
-        <option value="PAID">Pago</option>
-      </select>
+      <div className="mb-3 flex flex-wrap gap-2">
+        {(Object.keys(VIEWS) as ViewKey[]).map((k) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => router.push(`/admin/orders?view=${k}`)}
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+              view === k ? "border-brand bg-brand/10 text-brand" : "border-border text-foreground/60 hover:border-brand/50"
+            }`}
+          >
+            {VIEWS[k].label}
+          </button>
+        ))}
+      </div>
 
       <p className="mb-3 max-w-2xl text-xs text-foreground/50">
-        Pedidos nascem &quot;Pendente&quot; assim que o cliente é enviado ao checkout, e viram &quot;Pago&quot;
-        automaticamente assim que o checkout confirma o Pix na BravoPay — nada aqui precisa de atualização manual.
-        Atualiza sozinho a cada 5s.
+        {VIEWS[view].hint} Pedidos viram &quot;Pago&quot; sozinhos quando a BravoPay confirma o Pix. Atualiza a cada 5s.
       </p>
 
       <div className="overflow-x-auto rounded-xl border border-border bg-surface">
@@ -152,7 +172,7 @@ export default function AdminOrdersPage() {
                 <td colSpan={7} className="px-4 py-10 text-center text-foreground/50">
                   <p className="font-medium">Nenhum pedido encontrado.</p>
                   <p className="mt-1 text-xs">
-                    {statusFilter ? "Tente outro filtro de status." : "Pedidos aparecem aqui assim que um cliente inicia o checkout."}
+                    {view === "reais" ? "Pedidos aparecem aqui assim que um cliente preenche o checkout." : "Nenhum pedido nesta visão."}
                   </p>
                 </td>
               </tr>
@@ -226,5 +246,13 @@ export default function AdminOrdersPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+export default function AdminOrdersPage() {
+  return (
+    <Suspense fallback={<div className="text-sm text-foreground/50">Carregando…</div>}>
+      <AdminOrdersInner />
+    </Suspense>
   );
 }

@@ -91,10 +91,19 @@ export async function onlineNow(limit = 100): Promise<OnlineData> {
   try {
     await ensureTable();
     const since = new Date(Date.now() - ONLINE_WINDOW_MS);
-    const [count, sessions] = await Promise.all([
-      db.visitorSession.count({ where: { lastSeenAt: { gte: since } } }),
-      db.visitorSession.findMany({ where: { lastSeenAt: { gte: since } }, orderBy: { lastSeenAt: "desc" }, take: limit }),
-    ]);
+    const allSessions = await db.visitorSession.findMany({
+      where: { lastSeenAt: { gte: since } },
+      orderBy: { lastSeenAt: "desc" },
+      take: 500,
+    });
+
+    // 1 contagem por PESSOA, não por aba: sessionStorage gera um id por aba, então a
+    // mesma pessoa com a home numa aba e o produto em outra (que aqui são a mesma
+    // página) contava 2x. Dedup pelo visitorId (localStorage, estável entre abas),
+    // mantendo a sessão mais recente de cada um.
+    const seen = new Set<string>();
+    const sessions = allSessions.filter((s) => (seen.has(s.visitorId) ? false : (seen.add(s.visitorId), true))).slice(0, limit);
+    const count = seen.size;
 
     // Cruza quem está na tela do pedido com o status real daquele pedido.
     const orderNumbers = Array.from(
