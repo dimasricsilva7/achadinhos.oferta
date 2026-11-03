@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { getCrediarioByOrderIds } from "@/lib/crediario-store";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -27,5 +28,11 @@ export async function GET(req: NextRequest) {
     db.order.count({ where }),
   ]);
 
-  return NextResponse.json({ items, total, page, pageSize });
+  // Pedidos no crediário guardam os detalhes (parcelas, protocolo mascarado) numa
+  // tabela própria — anexa aqui para o admin ver, sem o protocolo em claro.
+  const credIds = items.filter((o) => o.status.startsWith("CREDIARIO")).map((o) => o.id);
+  const cred = await getCrediarioByOrderIds(credIds);
+  const itemsWithCred = items.map((o) => ({ ...o, crediario: cred.get(o.id) ?? null }));
+
+  return NextResponse.json({ items: itemsWithCred, total, page, pageSize });
 }
