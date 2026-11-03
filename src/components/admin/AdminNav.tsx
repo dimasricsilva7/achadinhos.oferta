@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/admin/orders", label: "Pedidos", exact: true },
   { href: "/admin/orders?view=abandonados", label: "Checkout abandonado" },
   { href: "/admin/clicks", label: "Cliques em Comprar" },
+  { href: "/admin/crediario", label: "Crediário" },
   { href: "/admin/settings", label: "Configurações" },
 ];
 

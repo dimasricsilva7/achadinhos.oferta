@@ -4,6 +4,8 @@ import { getSettings } from "@/lib/settings-service";
 import { computeShippingCents, amountToChargeCents } from "@/lib/payments/orders";
 import { getTransaction } from "@/lib/payments/bravopay";
 import { pixQrDataUrl } from "@/lib/pix-qr";
+import { crediarioConfig } from "@/lib/crediario";
+import { getCrediarioSettings } from "@/lib/crediario-store";
 import { CheckoutClient, type Pix } from "./CheckoutClient";
 
 export const dynamic = "force-dynamic";
@@ -42,6 +44,7 @@ export default async function CheckoutPage({ params }: { params: Promise<{ order
   if (order.status === "PAID") redirect(`/obrigado?pedido=${encodeURIComponent(orderNumber)}`);
 
   const settings = await getSettings();
+  const credCfg = crediarioConfig(await getCrediarioSettings());
   const shippingCents = computeShippingCents(order.product);
   const amountCents = amountToChargeCents(order.totalCents, shippingCents);
   const image = order.variant?.imageUrl ?? order.product.images[0]?.url ?? null;
@@ -86,7 +89,8 @@ export default async function CheckoutPage({ params }: { params: Promise<{ order
       storeName={settings.siteShortName || settings.siteName}
       initialPix={initialPix}
       prefill={prefill}
-      crediarioEnabled={process.env.CREDIARIO_ENABLED === "true"}
+      crediarioEnabled={credCfg.enabled}
+      crediarioConfig={credCfg}
     />
   );
 }

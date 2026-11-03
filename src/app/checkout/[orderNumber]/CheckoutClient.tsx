@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { formatCentsBRL } from "@/lib/money";
+import type { CrediarioConfig } from "@/lib/crediario";
+import { CrediarioFields, EMPTY_CREDIARIO, type CrediarioValue } from "@/components/checkout/CrediarioFields";
 
 // Cores do checkout do app Shopee (fiéis às telas de referência), fixas aqui para
 // não dependerem do tema laranja da vitrine.
@@ -23,9 +25,10 @@ export type CheckoutClientProps = {
   storeName: string;
   initialPix: Pix | null;
   prefill: Partial<FormState> | null;
-  // Crediário (parcelado) fica atrás desta flag (env CREDIARIO_ENABLED). Desligada,
-  // a opção não aparece — o checkout segue 100% Pix, sem impacto no tráfego do anúncio.
+  // Crediário (pagamento por protocolo). Ligado/desligado e todos os textos vêm do
+  // admin (Configurações → Crediário). Desligado, a opção não aparece — checkout 100% Pix.
   crediarioEnabled: boolean;
+  crediarioConfig: CrediarioConfig;
 };
 
 type FormState = {
@@ -185,9 +188,11 @@ function Field({
 
 /* ============================ COMPONENTE ============================ */
 export function CheckoutClient(props: CheckoutClientProps) {
-  const [mode, setMode] = useState<"form" | "payment">(props.initialPix ? "payment" : "form");
+  const [mode, setMode] = useState<"form" | "payment" | "crediario_ok">(props.initialPix ? "payment" : "form");
   const [pix, setPix] = useState<Pix | null>(props.initialPix);
   const [method, setMethod] = useState<"pix" | "crediario">("pix");
+  const [crediario, setCrediario] = useState<CrediarioValue>(EMPTY_CREDIARIO);
+  const [crediarioOk, setCrediarioOk] = useState<{ title: string; message: string } | null>(null);
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM, ...(props.prefill ?? {}) });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [topError, setTopError] = useState<string | null>(null);
@@ -241,26 +246,28 @@ export function CheckoutClient(props: CheckoutClientProps) {
 
   async function handleSubmit() {
     if (submitting) return;
-    // Crediário ainda não tem fluxo de cobrança próprio — enquanto não for ligado de
-    // verdade, selecioná-lo não gera Pix nem quebra o checkout.
-    if (method === "crediario") {
-      setTopError("O crediário estará disponível em breve. Por enquanto, finalize no Pix.");
-      return;
-    }
     setSubmitting(true);
     setTopError(null);
     setErrors({});
+    const isCrediario = method === "crediario";
+    const endpoint = isCrediario ? "crediario" : "pay";
     try {
-      const res = await fetch(`/api/checkout/${props.orderNumber}/pay`, {
+      const res = await fetch(`/api/checkout/${props.orderNumber}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(isCrediario ? { ...form, crediario } : form),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setTopError(data.error ?? "Não foi possível concluir. Confira os dados e tente novamente.");
         if (data.fields) setErrors(data.fields);
         setSubmitting(false);
+        return;
+      }
+      if (isCrediario) {
+        setCrediarioOk({ title: data.title ?? props.crediarioConfig.successTitle, message: data.message ?? props.crediarioConfig.successMessage });
+        setMode("crediario_ok");
+        window.scrollTo({ top: 0 });
         return;
       }
       if (data.redirectUrl) {
@@ -296,7 +303,7 @@ export function CheckoutClient(props: CheckoutClientProps) {
             <BackIcon />
           </button>
           <h1 className="flex-1 pr-9 text-center text-base font-medium text-neutral-800">
-            {mode === "payment" ? "Pagamento" : "Comprar"}
+            {mode === "payment" ? "Pagamento" : mode === "crediario_ok" ? "Pedido recebido" : "Comprar"}
           </h1>
         </div>
       </header>
@@ -314,7 +321,18 @@ export function CheckoutClient(props: CheckoutClientProps) {
           onSubmit={handleSubmit}
           method={method}
           onMethodChange={setMethod}
+          crediario={crediario}
+          onCrediarioChange={setCrediario}
         />
+      ) : mode === "crediario_ok" ? (
+        <main className="mx-auto w-full max-w-lg px-4 py-10 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#EE4D2D]/10">
+            <svg viewBox="0 0 24 24" className="h-7 w-7 text-[#EE4D2D]" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><path d="M5 13l4 4L19 7" /></svg>
+          </div>
+          <h2 className="text-lg font-bold text-neutral-800">{crediarioOk?.title}</h2>
+          {crediarioOk?.message && <p className="mt-2 text-sm text-neutral-600">{crediarioOk.message}</p>}
+          <p className="mt-4 text-xs text-neutral-400">Pedido {props.orderNumber}</p>
+        </main>
       ) : (
         <PaymentView
           orderNumber={props.orderNumber}
@@ -339,6 +357,7 @@ function FormView({
   deliveryText,
   storeName,
   crediarioEnabled,
+  crediarioConfig: cfg,
   form,
   set,
   errors,
@@ -349,6 +368,8 @@ function FormView({
   onSubmit,
   method,
   onMethodChange,
+  crediario,
+  onCrediarioChange,
 }: CheckoutClientProps & {
   form: FormState;
   set: (k: keyof FormState) => (v: string) => void;
@@ -359,6 +380,8 @@ function FormView({
   onCepChange: (v: string) => void;
   onSubmit: () => void;
   method: "pix" | "crediario";
+  crediario: CrediarioValue;
+  onCrediarioChange: (v: CrediarioValue) => void;
   onMethodChange: (m: "pix" | "crediario") => void;
 }) {
   // Endereço recolhido por padrão: só CEP + Número à vista. Abre ao dar erro no CEP
@@ -499,13 +522,32 @@ function FormView({
               >
                 <div className="flex items-center gap-2.5">
                   <CardIcon />
-                  <span className="text-sm font-medium text-neutral-800">Crediário</span>
-                  <span className="rounded bg-[#EE4D2D]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#EE4D2D]">Parcele sua compra</span>
+                  <span className="text-sm font-medium text-neutral-800">{cfg.methodLabel}</span>
+                  {cfg.methodSubtitle && (
+                    <span className="rounded bg-[#EE4D2D]/10 px-1.5 py-0.5 text-[10px] font-medium text-[#EE4D2D]">{cfg.methodSubtitle}</span>
+                  )}
                 </div>
                 <RadioDot selected={method === "crediario"} />
               </button>
             )}
           </div>
+
+          {method === "crediario" && crediarioEnabled && (
+            <div className="mt-4 border-t border-neutral-100 pt-4">
+              {cfg.sectionTitle && <h3 className="mb-2 text-sm font-semibold text-neutral-800">{cfg.sectionTitle}</h3>}
+              <CrediarioFields
+                cfg={cfg}
+                totalCents={amountCents}
+                value={crediario}
+                onChange={(v) => onCrediarioChange(v)}
+                errors={Object.fromEntries(
+                  Object.entries(errors)
+                    .filter(([k]) => k.startsWith("crediario."))
+                    .map(([k, v]) => [k.slice("crediario.".length), v]),
+                )}
+              />
+            </div>
+          )}
         </section>
 
         {/* Detalhes de pagamento */}
@@ -543,7 +585,7 @@ function FormView({
             className="h-12 min-w-[170px] rounded-lg px-6 text-sm font-semibold text-white transition-colors disabled:opacity-60"
             style={{ backgroundColor: submitting ? SHOPEE_DARK : SHOPEE }}
           >
-            {submitting ? "Gerando Pix…" : "FAZER PEDIDO"}
+            {submitting ? (method === "crediario" ? "Registrando…" : "Gerando Pix…") : method === "crediario" ? cfg.buttonLabel : "FAZER PEDIDO"}
           </button>
         </div>
       </div>

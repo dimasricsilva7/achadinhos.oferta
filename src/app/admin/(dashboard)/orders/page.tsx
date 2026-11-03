@@ -17,6 +17,7 @@ type OrderRow = {
   customerCpf: string | null;
   product: { name: string; slug: string };
   variant: { label: string; groupName: string } | null;
+  crediario?: { protocolLast4: string; installments: number; installmentLabel: string; cpfLast: string; validity: string } | null;
 };
 
 // The checkout confirms PAID automatically the moment BravoPay approves the Pix —
@@ -30,6 +31,14 @@ function StatusBadge({ status }: { status: string }) {
       <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-1 text-xs font-semibold text-success">
         <span className="h-1.5 w-1.5 rounded-full bg-success" />
         Pago
+      </span>
+    );
+  }
+  if (status.startsWith("CREDIARIO")) {
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-1 text-xs font-semibold text-brand">
+        <span className="h-1.5 w-1.5 rounded-full bg-brand" />
+        Crediário — em análise
       </span>
     );
   }
@@ -201,6 +210,12 @@ function AdminOrdersInner() {
                   <td className="px-4 py-3 font-medium">{formatCentsBRL(o.totalCents)}</td>
                   <td className="px-4 py-3">
                     <StatusBadge status={o.status} />
+                    {o.crediario && (
+                      <div className="mt-2 text-[11px] text-foreground/60">
+                        <p>{o.crediario.installmentLabel}</p>
+                        <p>Protocolo ···{o.crediario.protocolLast4} · val. {o.crediario.validity} · CPF ···{o.crediario.cpfLast}</p>
+                      </div>
+                    )}
                     {o.status === "PENDING" && (wa || o.customerEmail) && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {wa && (
