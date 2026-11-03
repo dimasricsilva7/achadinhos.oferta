@@ -1,44 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 
+// O servidor roda em UTC, mas a loja (e o dono vendo o dashboard) estão no Brasil.
+// Sem isto, o "dia de hoje" era o dia UTC: depois das ~21h de Brasília o UTC já virou,
+// então uma venda da manhã/tarde do mesmo dia sumia do filtro "Hoje". Brasil é UTC-3 o
+// ano todo (sem horário de verão desde 2019), então basta um offset fixo.
+const BR_OFFSET_MIN = -180;
+// Instante UTC real correspondente a um horário do relógio de Brasília.
+const brInstant = (y: number, m: number, d: number, hh = 0, mi = 0, ss = 0, ms = 0) =>
+  new Date(Date.UTC(y, m, d, hh, mi, ss, ms) - BR_OFFSET_MIN * 60_000);
+
 function resolveRange(range: string, fromParam: string | null, toParam: string | null) {
-  const now = new Date();
-  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
-  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
+  // "Agora" com as partes de data já no fuso de Brasília (lidas via getUTC*).
+  const nowBr = new Date(Date.now() + BR_OFFSET_MIN * 60_000);
+  const Y = nowBr.getUTCFullYear(), M = nowBr.getUTCMonth(), D = nowBr.getUTCDate();
+  const startOfDay = (y: number, m: number, d: number) => brInstant(y, m, d);
+  const endOfDay = (y: number, m: number, d: number) => brInstant(y, m, d, 23, 59, 59, 999);
 
   switch (range) {
     case "yesterday": {
-      const y = new Date(now);
-      y.setDate(y.getDate() - 1);
-      return { from: startOfDay(y), to: endOfDay(y) };
+      const y = brInstant(Y, M, D - 1);
+      return { from: y, to: endOfDay(Y, M, D - 1) };
     }
-    case "7d": {
-      const from = new Date(now);
-      from.setDate(from.getDate() - 6);
-      return { from: startOfDay(from), to: endOfDay(now) };
-    }
-    case "30d": {
-      const from = new Date(now);
-      from.setDate(from.getDate() - 29);
-      return { from: startOfDay(from), to: endOfDay(now) };
-    }
-    case "month": {
-      return { from: new Date(now.getFullYear(), now.getMonth(), 1), to: endOfDay(now) };
-    }
-    case "lastMonth": {
-      const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
-      return { from, to };
-    }
+    case "7d":
+      return { from: startOfDay(Y, M, D - 6), to: endOfDay(Y, M, D) };
+    case "30d":
+      return { from: startOfDay(Y, M, D - 29), to: endOfDay(Y, M, D) };
+    case "month":
+      return { from: brInstant(Y, M, 1), to: endOfDay(Y, M, D) };
+    case "lastMonth":
+      return { from: brInstant(Y, M - 1, 1), to: brInstant(Y, M, 0, 23, 59, 59, 999) };
     case "custom": {
       if (fromParam && toParam) {
-        return { from: new Date(fromParam), to: endOfDay(new Date(toParam)) };
+        const f = new Date(fromParam), t = new Date(toParam);
+        return { from: brInstant(f.getFullYear(), f.getMonth(), f.getDate()), to: brInstant(t.getFullYear(), t.getMonth(), t.getDate(), 23, 59, 59, 999) };
       }
-      return { from: startOfDay(now), to: endOfDay(now) };
+      return { from: startOfDay(Y, M, D), to: endOfDay(Y, M, D) };
     }
     case "today":
     default:
-      return { from: startOfDay(now), to: endOfDay(now) };
+      return { from: startOfDay(Y, M, D), to: endOfDay(Y, M, D) };
   }
 }
 

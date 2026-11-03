@@ -7,7 +7,8 @@ const LINKS = [
   { href: "/admin", label: "Dashboard", exact: true },
   { href: "/admin/online", label: "Online ao vivo" },
   { href: "/admin/products", label: "Produtos" },
-  { href: "/admin/orders", label: "Pedidos" },
+  { href: "/admin/orders", label: "Pedidos", exact: true },
+  { href: "/admin/orders?view=abandonados", label: "Checkout abandonado" },
   { href: "/admin/clicks", label: "Cliques em Comprar" },
   { href: "/admin/settings", label: "Configurações" },
 ];

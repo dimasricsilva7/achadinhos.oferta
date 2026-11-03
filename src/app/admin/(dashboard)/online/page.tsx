@@ -12,10 +12,10 @@ type Data = { count: number; rows: OnlineRow[]; ok: boolean };
 
 function pageName(path: string | null): string {
   if (!path) return "—";
-  if (path === "/") return "Página inicial";
   if (path.startsWith("/checkout/")) return "Checkout (PIX)";
-  if (path.startsWith("/produto/")) return "Página de produto";
   if (path.startsWith("/obrigado")) return "Obrigado (pago)";
+  // Home e página de produto são a mesma vitrine aqui — uma coisa só.
+  if (path === "/" || path.startsWith("/produto/")) return "Página de produto";
   return path;
 }
 
